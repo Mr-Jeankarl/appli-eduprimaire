@@ -1,9 +1,9 @@
-# EduPrimaire — Logiciel de gestion d'école primaire
+# EduPrimaire — Logiciel de gestion d'école primaire (appli-eduprimaire)
 
 ## Stack technique
 - **Frontend** : React 18 + Vite + Tailwind CSS
-- **Backend**  : Node.js + Express + Prisma ORM
-- **Base de données** : PostgreSQL (Supabase recommandé)
+- **Backend**  : Django + SQLite
+- **Base de données** : SQLite
 
 ## Démarrage rapide
 
@@ -18,13 +18,12 @@ npm run dev
 ### 2. Backend
 ```bash
 cd backend
-npm install
-cp .env.example .env
-# Remplir DATABASE_URL et JWT_SECRET dans .env
-npx prisma generate
-npx prisma migrate dev --name init
-npm run dev
-# → http://localhost:5000
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver
+# → http://localhost:8000
 ```
 
 ## Modules
@@ -48,11 +47,3 @@ npm run dev
 | ENSEIGNANT | Ses classes uniquement |
 | COMPTABLE | Paiements uniquement |
 | PARENT | Portail lecture seule |
-
-## Variables d'environnement (.env)
-```
-DATABASE_URL="postgresql://..."
-JWT_SECRET="secret-long-et-aléatoire"
-PORT=5000
-FRONTEND_URL="http://localhost:5173"
-```
