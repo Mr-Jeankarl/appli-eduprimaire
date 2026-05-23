@@ -1,16 +1,39 @@
-import { useState } from 'react'
-import { classes } from '../../data/mockData'
+import { useState, useMemo } from 'react'
+import { classes as mockClasses, eleves } from '../../data/mockData'
 
-const INIT = { nom: '', prenom: '', dateNaissance: '', sexe: 'M', classeId: '', matricule: '', statut: 'INSCRIT', parentNom: '', parentTel: '', parentEmail: '' }
+const INIT = { nom: '', prenom: '', dateNaissance: '', sexe: 'M', classeId: '', matricule: '', statut: 'INSCRIT', parentNom: '', parentTel: '', parentEmail: '', parent2Nom: '', parent2Tel: '', parent2Email: '' }
 
-export default function EleveForm({ onSubmit, onCancel, initial = {} }) {
-  const [form, setForm] = useState({ ...INIT, ...initial })
+export default function EleveForm({ onSubmit, onCancel, initial = {}, classesOptions = mockClasses }) {
+  // Génération automatique du matricule
+  const autoMatricule = useMemo(() => {
+    const year = new Date().getFullYear()
+    const count = eleves.length + 1
+    return `#${year}-${String(count).padStart(3, '0')}`
+  }, [])
+
+  const [form, setForm] = useState({ ...INIT, matricule: autoMatricule, ...initial })
   const set = k => e => setForm(v => ({ ...v, [k]: e.target.value }))
 
   return (
     <form onSubmit={e => { e.preventDefault(); onSubmit(form) }} className="space-y-5">
       <div>
         <p className="text-xs font-bold text-slate uppercase tracking-wider mb-3">Informations élève</p>
+        <div className="flex items-center gap-4 mb-4">
+          <div className="w-20 h-20 bg-beige border border-beige-dark rounded-xl flex items-center justify-center overflow-hidden">
+            {form.photo ? (
+              <img src={typeof form.photo === 'string' ? form.photo : URL.createObjectURL(form.photo)} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-2xl">👤</span>
+            )}
+          </div>
+          <div>
+            <label className="btn-ghost text-xs py-1.5 cursor-pointer">
+              {form.photo ? 'Changer la photo' : 'Ajouter une photo'}
+              <input type="file" className="hidden" accept="image/*" onChange={e => setForm(v => ({ ...v, photo: e.target.files[0] }))} />
+            </label>
+            <p className="text-[10px] text-slate/60 mt-1">Format JPG, PNG. Max 2Mo.</p>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-semibold text-slate">Nom *</label>
@@ -35,12 +58,13 @@ export default function EleveForm({ onSubmit, onCancel, initial = {} }) {
             <label className="text-xs font-semibold text-slate">Classe *</label>
             <select required className="input-base mt-1" value={form.classeId} onChange={set('classeId')}>
               <option value="">Sélectionner...</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+              {classesOptions.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
             </select>
           </div>
           <div>
             <label className="text-xs font-semibold text-slate">Matricule</label>
-            <input className="input-base mt-1" placeholder="#2024-XXX" value={form.matricule} onChange={set('matricule')} />
+            <input className="input-base mt-1 bg-beige/50" readOnly value={form.matricule} placeholder="Auto-généré" />
+            <p className="text-[10px] text-slate/60 mt-0.5">Généré automatiquement</p>
           </div>
         </div>
       </div>
@@ -58,6 +82,23 @@ export default function EleveForm({ onSubmit, onCancel, initial = {} }) {
           <div>
             <label className="text-xs font-semibold text-slate">Email</label>
             <input type="email" className="input-base mt-1" placeholder="parent@email.com" value={form.parentEmail} onChange={set('parentEmail')} />
+          </div>
+        </div>
+      </div>
+      <div className="border-t border-beige-dark pt-4">
+        <p className="text-xs font-bold text-slate uppercase tracking-wider mb-3">2ème Parent / Tuteur <span className="text-slate/50 normal-case font-normal">(optionnel)</span></p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="text-xs font-semibold text-slate">Nom du 2ème parent</label>
+            <input className="input-base mt-1" placeholder="Fatou TRAORÉ" value={form.parent2Nom} onChange={set('parent2Nom')} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate">Téléphone</label>
+            <input className="input-base mt-1" placeholder="+226 76 XX XX XX" value={form.parent2Tel} onChange={set('parent2Tel')} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate">Email</label>
+            <input type="email" className="input-base mt-1" placeholder="parent2@email.com" value={form.parent2Email} onChange={set('parent2Email')} />
           </div>
         </div>
       </div>

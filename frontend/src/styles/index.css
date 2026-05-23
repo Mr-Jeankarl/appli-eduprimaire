@@ -2,27 +2,101 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-page: #F5F0E8;
+  --bg-card: #FDFCFA;
+  --text-navy: #1E3A5F;
+  --text-slate: #64748B;
+  --text-slate-light: #94A3B8;
+  --border-beige: #EDE6D6;
+  --bg-beige-dark: #E5DDD0;
+  --amber: #F5A623;
+  --amber-dark: #D48806;
+  --sage: #27AE60;
+  --coral: #E05C7A;
+  --navy-light: #2C5282;
+}
+
+.dark {
+  --bg-page: #0F172A;
+  --bg-card: #1E293B;
+  --text-navy: #F1F5F9;
+  --text-slate: #94A3B8;
+  --text-slate-light: #64748B;
+  --border-beige: #334155;
+  --bg-beige-dark: #1E293B;
+  --navy-light: #334155;
+}
+
 @layer base {
   * { box-sizing: border-box; }
-  body { font-family: 'DM Sans', system-ui, sans-serif; background-color: #F5F0E8; color: #1E3A5F; -webkit-font-smoothing: antialiased; }
+  body { 
+    font-family: 'DM Sans', system-ui, sans-serif; 
+    background-color: var(--bg-page); 
+    color: var(--text-navy); 
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
   h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; }
 }
 
 @layer components {
   ::-webkit-scrollbar { width: 5px; height: 5px; }
-  ::-webkit-scrollbar-track { background: #EDE6D6; }
+  ::-webkit-scrollbar-track { background: var(--border-beige); }
   ::-webkit-scrollbar-thumb { background: #C4B99A; border-radius: 99px; }
-  .card { @apply bg-beige-card rounded-xl shadow-card border border-beige-dark; }
-  .input-base { @apply w-full bg-beige border border-beige-dark rounded-lg px-3 py-2 text-sm text-navy focus:outline-none focus:ring-2 focus:ring-amber/40 focus:border-amber placeholder:text-slate-light transition; }
+  
+  .card { 
+    background-color: var(--bg-card);
+    border-color: var(--border-beige);
+    @apply rounded-xl shadow-card border; 
+  }
+  
+  .input-base { 
+    background-color: var(--bg-page);
+    border-color: var(--border-beige);
+    color: var(--text-navy);
+    @apply w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber/40 focus:border-amber transition;
+  }
+  .input-base::placeholder { color: var(--text-slate-light); }
+
   .badge-green { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sage/10 text-sage; }
   .badge-amber { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber/15 text-amber-dark; }
   .badge-red   { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-coral/10 text-coral; }
   .badge-slate { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate/10 text-slate; }
   .badge-navy  { @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-navy/10 text-navy; }
-  .btn-primary { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy-light transition active:scale-95; }
+  
+  .btn-primary { 
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-navy text-white text-sm font-semibold hover:bg-navy-light transition active:scale-95 border border-transparent; 
+  }
+  .dark .btn-primary {
+    @apply bg-slate-700 hover:bg-slate-600;
+  }
+
   .btn-amber   { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber text-white text-sm font-semibold hover:bg-amber-dark transition active:scale-95; }
-  .btn-ghost   { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-navy text-sm font-medium hover:bg-beige-dark transition active:scale-95; }
+  
+  .btn-ghost   { 
+    color: var(--text-navy);
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium hover:bg-beige-dark transition active:scale-95; 
+  }
+  
   .btn-danger  { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-coral text-white text-sm font-semibold hover:opacity-90 transition active:scale-95; }
+  
+  .shadow-modal {
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+}
+
+/* Responsive Table Utility */
+.table-responsive {
+  @apply w-full overflow-x-auto custom-scrollbar;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-backdrop { animation: fadeIn 0.15s ease; }

@@ -1,8 +1,10 @@
-import { useState } from 'react'
-import { Save, Plus, Edit2, Trash2, Eye, EyeOff, Shield, School, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Save, Plus, Edit2, Trash2, Eye, EyeOff, Shield, School, Users, ToggleLeft, ToggleRight, Moon, Sun, Palette, Building2, Copy, RefreshCw, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { ecole as initEcole, utilisateurs as initUsers } from '../../data/mockData'
 import { Avatar } from '../../components/ui/index'
 import Modal from '../../components/ui/Modal'
+import { useAuth } from '../../context/AuthContext'
+import { apiRequest, create, list, remove, update } from '../../services/api'
 
 const ROLES = [
   { value: 'ADMIN',      label: 'Administrateur', badge: 'badge-red',   desc: 'Accès total au système' },
@@ -22,8 +24,27 @@ const PERMS = {
 
 const TABS = [
   { id: 'ecole', label: 'École', icon: School },
+  { id: 'modules', label: 'Modules', icon: ToggleRight },
   { id: 'users', label: 'Utilisateurs', icon: Users },
   { id: 'roles', label: 'Rôles et Droits', icon: Shield },
+  { id: 'apparence', label: 'Apparence', icon: Palette },
+  { id: 'saas', label: 'Multi-Écoles', icon: Building2, adminOnly: true },
+]
+const MODULE_API_CODES = {
+  notes: 'NOTES',
+  presences: 'PRESENCES',
+  emploidutemps: 'EMPLOI_DU_TEMPS',
+  paiements: 'COMPTABILITE',
+  messages: 'MESSAGERIE',
+  bibliotheque: 'BIBLIOTHEQUE',
+}
+
+// Mock données SaaS — écoles enregistrées
+const ecolesReseau = [
+  { id: 's-1', nom: 'École Les Étoiles',      ville: 'Bobo-Dioulasso', pays: 'BF', code: 'EDU-BF-2024-001', statut: 'ACTIF',    eleves: 312, plan: 'Pro' },
+  { id: 's-2', nom: 'École Horizon',           ville: 'Ouagadougou',   pays: 'BF', code: 'EDU-BF-2024-002', statut: 'ACTIF',    eleves: 178, plan: 'Starter' },
+  { id: 's-3', nom: 'Groupe Scolaire Lumière', ville: 'Abidjan',       pays: 'CI', code: 'EDU-CI-2024-003', statut: 'EN_ESSAI', eleves: 94,  plan: 'Trial' },
+  { id: 's-4', nom: 'Académie du Savoir',      ville: 'Dakar',         pays: 'SN', code: 'EDU-SN-2024-004', statut: 'SUSPENDU', eleves: 0,   plan: 'Starter' },
 ]
 
 function UserForm({ initial = {}, onSubmit, onCancel }) {
@@ -77,6 +98,9 @@ function UserForm({ initial = {}, onSubmit, onCancel }) {
 }
 
 export default function Parametres() {
+  const { user } = useAuth()
+  const isDirecteur = user?.role === 'DIRECTEUR'
+
   const [tab, setTab]       = useState('ecole')
   const [ecole, setEcole]   = useState(initEcole)
   const [saved, setSaved]   = useState(false)
@@ -86,21 +110,124 @@ export default function Parametres() {
   const [modalEdit, setModalEdit]   = useState(null)
   const [modalDel, setModalDel]     = useState(null)
 
+  useEffect(() => {
+    let mounted = true
+    Promise.all([apiRequest('/ecole/'), list('/auth/utilisateurs/'), list('/ecole/modules/')])
+      .then(([ecoleApi, usersApi, modulesApi]) => {
+        if (!mounted) return
+        setEcole({
+          nom: ecoleApi.nom || '',
+          ville: ecoleApi.adresse || '',
+          pays: 'Burkina Faso',
+          telephone: ecoleApi.telephone || '',
+          email: ecoleApi.email || '',
+          anneeScolaire: ecoleApi.annee_scolaire || '',
+          logoInitiales: (ecoleApi.nom || 'EP').slice(0, 2).toUpperCase(),
+        })
+        setUsers(usersApi.map(u => ({ id: u.id, nom: u.nom, prenom: u.prenom, email: u.email, telephone: u.telephone, role: u.role, actif: u.is_active })))
+        setModules(v => ({
+          ...v,
+          ...Object.fromEntries(Object.entries(MODULE_API_CODES).map(([key, code]) => [key, modulesApi.find(m => m.module === code)?.actif ?? v[key]])),
+        }))
+      })
+      .catch(error => console.error('Chargement paramètres API impossible:', error))
+    return () => { mounted = false }
+  }, [])
+
   const setE = k => e => setEcole(v => ({ ...v, [k]: e.target.value }))
-  const handleSave  = () => { setSaved(true); setTimeout(() => setSaved(false), 2000) }
-  const handleAjout = data => { setUsers(v => [...v, { ...data, id: `u-${Date.now()}`, actif: true }]); setModalAjout(false) }
-  const handleEdit  = data => { setUsers(v => v.map(u => u.id === data.id ? data : u)); setModalEdit(null) }
-  const handleDel   = ()   => { setUsers(v => v.filter(u => u.id !== modalDel.id)); setModalDel(null) }
-  const toggleActif = id  => setUsers(v => v.map(u => u.id === id ? { ...u, actif: !u.actif } : u))
+  const handleSave  = async () => {
+    await update('/ecole/', { nom: ecole.nom, adresse: ecole.ville, telephone: ecole.telephone, email: ecole.email, annee_scolaire: ecole.anneeScolaire })
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+  const userBody = data => ({ nom: data.nom, prenom: data.prenom, email: data.email, telephone: data.telephone || '', role: data.role, password: data.motDePasse, password_confirm: data.motDePasse })
+  const handleAjout = async data => { const saved = await create('/auth/utilisateurs/', userBody(data)); setUsers(v => [...v, { id: saved.id, nom: saved.nom, prenom: saved.prenom, email: saved.email, telephone: saved.telephone, role: saved.role, actif: saved.is_active }]); setModalAjout(false) }
+  const handleEdit  = async data => { const saved = await update(`/auth/utilisateurs/${data.id}/`, { nom: data.nom, prenom: data.prenom, email: data.email, telephone: data.telephone || '', role: data.role, is_active: data.actif }); setUsers(v => v.map(u => u.id === data.id ? { id: saved.id, nom: saved.nom, prenom: saved.prenom, email: saved.email, telephone: saved.telephone, role: saved.role, actif: saved.is_active } : u)); setModalEdit(null) }
+  const handleDel   = async () => { await remove(`/auth/utilisateurs/${modalDel.id}/`); setUsers(v => v.filter(u => u.id !== modalDel.id)); setModalDel(null) }
+  const toggleActif = async id => {
+    const current = users.find(u => u.id === id)
+    if (!current) return
+    const saved = await update(`/auth/utilisateurs/${id}/`, { is_active: !current.actif })
+    setUsers(v => v.map(u => u.id === id ? { ...u, actif: saved.is_active } : u))
+  }
 
   const filteredUsers = users.filter(u => !filtreRole || u.role === filtreRole)
+
+  // Modules activés/désactivés
+  const [modules, setModules] = useState({
+    notes: true, presences: true, emploidutemps: true,
+    paiements: true, messages: true, bibliotheque: true,
+  })
+  const toggleModule = async key => {
+    const moduleCode = MODULE_API_CODES[key] || key.toUpperCase()
+    const saved = await update(`/ecole/modules/${moduleCode}/toggle/`, { actif: !modules[key] })
+    setModules(v => ({ ...v, [key]: saved.actif }))
+    // Notifier l'application: événement pour l'onglet courant et stockage pour autres onglets
+    window.dispatchEvent(new Event('module-toggled'))
+    try {
+      localStorage.setItem('module-toggled', String(Date.now()))
+    } catch (e) {
+      // ignore (some browsers may block localStorage)
+    }
+  }
+
+  // Apparence
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark')
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark')
+      localStorage.setItem('theme', 'dark')
+    } else {
+      document.documentElement.classList.remove('dark')
+      localStorage.setItem('theme', 'light')
+    }
+  }, [darkMode])
+
+  const toggleDarkMode = () => setDarkMode(v => !v)
+
+  // État SaaS
+  const [codesInvit, setCodesInvit] = useState([
+    { id: 'ci-1', code: 'INVITE-XK92P', cible: 'Nouvelle école partenaire',  statut: 'EN_ATTENTE', cree: '2024-05-10', expire: '2024-06-10' },
+    { id: 'ci-2', code: 'INVITE-LM44T', cible: 'École Les Colibris',         statut: 'UTILISE',    cree: '2024-04-01', expire: '2024-05-01' },
+  ])
+  const [copie, setCopie] = useState(null)
+
+  const genererCode = () => {
+    // Request backend to create an invitation for the current user's school
+    create('/ecole/invitations/', {})
+      .then(saved => {
+        const now = new Date(saved.cree_le)
+        setCodesInvit(v => [{ id: saved.id, code: saved.code, cible: saved.ecole_nom || 'Nouvelle école', statut: saved.utilise ? 'UTILISE' : 'EN_ATTENTE', cree: now.toISOString().split('T')[0], expire: saved.expire_le ? saved.expire_le.split('T')[0] : '' }, ...v])
+      })
+      .catch(() => {
+        // fallback to client-side generation if API fails
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        const code = 'INVITE-' + Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+        const now = new Date()
+        const expire = new Date(now); expire.setMonth(expire.getMonth() + 1)
+        setCodesInvit(v => [{ id: `ci-${Date.now()}`, code, cible: 'Nouvelle école', statut: 'EN_ATTENTE', cree: now.toISOString().split('T')[0], expire: expire.toISOString().split('T')[0] }, ...v])
+      })
+  }
+
+  const copierCode = (code) => {
+    navigator.clipboard?.writeText(code).catch(() => {})
+    setCopie(code)
+    setTimeout(() => setCopie(null), 2000)
+  }
+
+  // Tabs accessibles au directeur
+  const isAdmin = user?.role === 'ADMIN'
+  const visibleTabs = isDirecteur
+    ? TABS.filter(t => ['ecole', 'modules', 'roles', 'apparence'].includes(t.id))
+    : isAdmin ? TABS : TABS.filter(t => !t.adminOnly)
 
   return (
     <div className="p-6 space-y-5 page-enter">
       <div><h1 className="font-display text-2xl font-bold text-navy">Paramètres</h1><p className="text-slate text-sm mt-0.5">Configuration générale de l'application</p></div>
 
-      <div className="flex gap-1 bg-beige-dark/40 p-1 rounded-xl w-fit">
-        {TABS.map(t => {
+      <div className="flex gap-1 bg-beige-dark/40 p-1 rounded-xl w-fit flex-wrap">
+        {visibleTabs.map(t => {
           const Icon = t.icon
           return (
             <button key={t.id} onClick={() => setTab(t.id)} className={"flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition " + (tab === t.id ? 'bg-beige-card shadow-card text-navy' : 'text-slate hover:text-navy')}>
@@ -187,7 +314,7 @@ export default function Parametres() {
 
       {tab === 'roles' && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {ROLES.map(r => (
+          {ROLES.filter(r => !isDirecteur || r.value !== 'ADMIN').map(r => (
             <div key={r.value} className="card p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <span className={r.badge + ' text-xs'}>{r.label}</span>
@@ -203,6 +330,185 @@ export default function Parametres() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {tab === 'modules' && (
+        <div className="card p-6 max-w-2xl space-y-5">
+          <h2 className="font-display font-bold text-navy text-lg">Modules actifs</h2>
+          <p className="text-xs text-slate">Activez ou désactivez les modules pour tous les utilisateurs de l'école.</p>
+          <div className="space-y-3">
+            {[
+              { key: 'notes', label: 'Notes & Bulletins', desc: 'Saisie et consultation des notes' },
+              { key: 'presences', label: 'Présences & Appel', desc: 'Suivi de l\'assiduité quotidienne' },
+              { key: 'emploidutemps', label: 'Emploi du Temps', desc: 'Planning hebdomadaire des classes' },
+              { key: 'paiements', label: 'Paiements', desc: 'Gestion financière et recouvrement' },
+              { key: 'messages', label: 'Messages', desc: 'Communication interne' },
+              { key: 'bibliotheque', label: 'Bibliothèque', desc: 'Catalogue et emprunts de livres' },
+            ].map(m => (
+              <div key={m.key} className="flex items-center justify-between py-3 px-4 rounded-xl border border-beige-dark hover:bg-beige/40 transition">
+                <div>
+                  <p className="text-sm font-semibold text-navy">{m.label}</p>
+                  <p className="text-xs text-slate">{m.desc}</p>
+                </div>
+                <button onClick={() => toggleModule(m.key)} className="flex-shrink-0">
+                  {modules[m.key]
+                    ? <ToggleRight size={28} className="text-sage" />
+                    : <ToggleLeft size={28} className="text-slate/40" />
+                  }
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'apparence' && (
+        <div className="card p-6 max-w-2xl space-y-5">
+          <h2 className="font-display font-bold text-navy text-lg">Apparence</h2>
+          <div className="flex items-center justify-between py-4 px-4 rounded-xl border border-beige-dark">
+            <div className="flex items-center gap-3">
+              {darkMode ? <Moon size={20} className="text-navy" /> : <Sun size={20} className="text-amber" />}
+              <div>
+                <p className="text-sm font-semibold text-navy">Thème sombre</p>
+                <p className="text-xs text-slate">Passer l'interface en mode nuit</p>
+              </div>
+            </div>
+            <button onClick={toggleDarkMode} className="flex-shrink-0">
+              {darkMode
+                ? <ToggleRight size={28} className="text-sage" />
+                : <ToggleLeft size={28} className="text-slate-400" />
+              }
+            </button>
+          </div>
+          <div className="bg-beige border border-beige-dark rounded-xl p-4">
+            <p className="text-xs text-slate">Le thème sombre est désormais actif sur toute l'interface. Votre préférence est sauvegardée dans ce navigateur.</p>
+          </div>
+        </div>
+      )}
+
+      {tab === 'saas' && isAdmin && (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="card p-5 bg-navy text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display font-bold text-xl flex items-center gap-2"><Building2 size={20} className="text-amber" /> Architecture Multi-Écoles</h2>
+              <p className="text-white/60 text-sm mt-1">{ecolesReseau.length} établissements enregistrés · SaaS EduPrimaire v2.0</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={genererCode} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber text-navy font-semibold text-sm hover:bg-amber/90 transition">
+                <RefreshCw size={15} /> Générer un code
+              </button>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: 'Écoles actives',  val: ecolesReseau.filter(e => e.statut === 'ACTIF').length,    color: 'text-sage' },
+              { label: 'En essai',        val: ecolesReseau.filter(e => e.statut === 'EN_ESSAI').length,  color: 'text-amber-dark' },
+              { label: 'Suspendues',      val: ecolesReseau.filter(e => e.statut === 'SUSPENDU').length,  color: 'text-coral' },
+              { label: 'Total élèves',    val: ecolesReseau.reduce((s, e) => s + e.eleves, 0),            color: 'text-navy' },
+            ].map(s => (
+              <div key={s.label} className="card p-4 text-center">
+                <p className={`font-display font-bold text-2xl ${s.color}`}>{s.val}</p>
+                <p className="text-xs text-slate mt-1">{s.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Liste des écoles */}
+          <div className="card overflow-hidden">
+            <div className="px-5 py-3 bg-beige border-b border-beige-dark">
+              <h3 className="text-xs font-bold text-slate uppercase tracking-wider">Établissements enregistrés</h3>
+            </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-beige-dark/60">
+                  {['École', 'Localisation', 'Plan', 'Élèves', 'Code accès', 'Statut'].map(h => (
+                    <th key={h} className="text-left px-4 py-3 text-xs font-bold text-slate uppercase tracking-wider">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {ecolesReseau.map(e => (
+                  <tr key={e.id} className="border-b border-beige-dark/60 hover:bg-beige/40 transition">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-navy/8 flex items-center justify-center flex-shrink-0">
+                          <Building2 size={13} className="text-navy/40" />
+                        </div>
+                        <span className="font-semibold text-navy text-sm">{e.nom}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate">{e.ville}, {e.pays}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+                        e.plan === 'Pro' ? 'bg-amber/10 text-amber-dark border-amber/30' :
+                        e.plan === 'Trial' ? 'bg-slate/10 text-slate border-slate/20' :
+                        'bg-navy/8 text-navy border-navy/20'
+                      }`}>{e.plan}</span>
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-navy">{e.eleves}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs bg-beige px-2 py-0.5 rounded font-mono text-slate">{e.code}</code>
+                        <button onClick={() => copierCode(e.code)} className="text-slate hover:text-navy transition" title="Copier">
+                          {copie === e.code ? <CheckCircle2 size={13} className="text-sage" /> : <Copy size={13} />}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                        e.statut === 'ACTIF' ? 'bg-sage/10 text-sage' :
+                        e.statut === 'EN_ESSAI' ? 'bg-amber/10 text-amber-dark' :
+                        'bg-coral/10 text-coral'
+                      }`}>
+                        {e.statut === 'ACTIF' ? '● Actif' : e.statut === 'EN_ESSAI' ? '◐ Essai' : '○ Suspendu'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Codes d'invitation */}
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display font-bold text-navy text-lg">Codes d'invitation</h3>
+              <button onClick={genererCode} className="btn-primary text-xs px-3 py-1.5">
+                <Plus size={13} /> Nouveau code
+              </button>
+            </div>
+            <p className="text-xs text-slate">Partagez ces codes avec les directeurs d'établissements pour leur permettre de rejoindre le réseau EduPrimaire.</p>
+            <div className="space-y-2">
+              {codesInvit.map(c => (
+                <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-beige-dark bg-beige/30 hover:bg-beige/60 transition">
+                  <div className={`flex-shrink-0 ${
+                    c.statut === 'UTILISE' ? 'text-sage' : c.statut === 'EN_ATTENTE' ? 'text-amber-dark' : 'text-coral'
+                  }`}>
+                    {c.statut === 'UTILISE' ? <CheckCircle2 size={16} /> : c.statut === 'EN_ATTENTE' ? <Clock size={16} /> : <XCircle size={16} />}
+                  </div>
+                  <code className="font-mono text-sm font-bold text-navy flex-1">{c.code}</code>
+                  <div className="text-right hidden sm:block">
+                    <p className="text-xs text-slate">{c.cible}</p>
+                    <p className="text-[10px] text-slate/50">Expire le {c.expire}</p>
+                  </div>
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                    c.statut === 'UTILISE' ? 'bg-sage/10 text-sage' : c.statut === 'EN_ATTENTE' ? 'bg-amber/10 text-amber-dark' : 'bg-coral/10 text-coral'
+                  }`}>
+                    {c.statut === 'UTILISE' ? 'Utilisé' : c.statut === 'EN_ATTENTE' ? 'En attente' : 'Expiré'}
+                  </span>
+                  {c.statut === 'EN_ATTENTE' && (
+                    <button onClick={() => copierCode(c.code)} className="text-slate hover:text-navy transition flex-shrink-0" title="Copier">
+                      {copie === c.code ? <CheckCircle2 size={15} className="text-sage" /> : <Copy size={15} />}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

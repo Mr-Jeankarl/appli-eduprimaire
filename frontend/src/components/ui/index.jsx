@@ -43,14 +43,19 @@ export function StatCard({ titre, valeur, sous, icon: Icon, variant = 'default',
 }
 
 // Avatar
-export function Avatar({ prenom, nom, size = 'md' }) {
+export function Avatar({ prenom, nom, src, size = 'md' }) {
   const initiales = `${(prenom || '')[0] || ''}${(nom || '')[0] || ''}`.toUpperCase()
   const palettes = ['bg-amber/20 text-amber-dark', 'bg-navy/10 text-navy', 'bg-sage/15 text-sage', 'bg-coral/10 text-coral']
   const idx = (prenom?.charCodeAt(0) || 0) % palettes.length
   const sizes = { sm: 'w-8 h-8 text-xs', md: 'w-9 h-9 text-sm', lg: 'w-12 h-12 text-base' }
+  
   return (
-    <div className={`${sizes[size]} ${palettes[idx]} rounded-full flex items-center justify-center font-bold flex-shrink-0`}>
-      {initiales}
+    <div className={`${sizes[size]} ${palettes[idx]} rounded-full flex items-center justify-center font-bold flex-shrink-0 overflow-hidden`}>
+      {src ? (
+        <img src={src} alt={`${prenom} ${nom}`} className="w-full h-full object-cover" />
+      ) : (
+        initiales
+      )}
     </div>
   )
 }

@@ -8,15 +8,16 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const navigate = useNavigate()
   const { login } = useAuth()
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    
-    // Simulate login
-    const result = login(email, password)
+    setSubmitting(true)
+    const result = await login(email, password)
+    setSubmitting(false)
     if (result.success) {
       navigate('/dashboard')
     } else {
@@ -69,7 +70,8 @@ export default function Login() {
                 />
               </div>
               <p className="mt-1 text-xs text-slate">
-                Mock emails: admin@etoiles.bf, directeur@etoiles.bf, etc.
+                Comptes démo (Mot de passe: <strong>password123</strong>)<br/>
+                admin@etoiles.bf, directeur@etoiles.bf, comptable@etoiles.bf, parent1@gmail.com
               </p>
             </div>
 
@@ -117,10 +119,14 @@ export default function Login() {
             <div>
               <button
                 type="submit"
+                disabled={submitting}
                 className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-navy hover:bg-navy-light focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber transition-colors"
               >
-                Se connecter
+                {submitting ? 'Connexion...' : 'Se connecter'}
               </button>
+            </div>
+            <div className="mt-4 text-center text-sm">
+              <Link to="/register" className="font-medium text-amber hover:text-amber-dark">Créer un compte</Link>
             </div>
           </form>
         </div>

@@ -41,6 +41,9 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_modification = models.DateTimeField(auto_now=True)
     derniere_connexion = models.DateTimeField(null=True, blank=True)
 
+    # Association optionnelle à une école (multi-tenant)
+    ecole = models.ForeignKey('ecole.Ecole', on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+
     # Modules qu'il peut activer/désactiver (pour les rôles autorisés)
     peut_gerer_modules = models.BooleanField(default=False)
 

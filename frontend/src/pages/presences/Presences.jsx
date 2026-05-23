@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Save, CheckCircle2, XCircle, Clock, AlertCircle } from 'lucide-react'
-import { eleves, classes, presences as initPresences } from '../../data/mockData'
 import { Avatar } from '../../components/ui/index'
 import { useAuth } from '../../context/AuthContext'
+import { create, list, update } from '../../services/api'
 
 const STATUTS = [
   { key: 'PRESENT',             label: 'Présent',     icon: CheckCircle2, active: 'bg-sage text-white border-sage',     base: 'bg-sage/8 border-sage/20 text-sage' },
@@ -10,35 +10,96 @@ const STATUTS = [
   { key: 'ABSENT_NON_JUSTIFIE', label: 'Absent (NJ)', icon: XCircle,      active: 'bg-coral text-white border-coral',   base: 'bg-coral/8 border-coral/20 text-coral' },
   { key: 'RETARD',              label: 'Retard',       icon: Clock,        active: 'bg-slate text-white border-slate',   base: 'bg-slate/8 border-slate/20 text-slate' },
 ]
+const toApiStatut = s => s === 'ABSENT_NON_JUSTIFIE' ? 'ABSENT' : s === 'ABSENT_JUSTIFIE' ? 'EXCUSE' : s
+const toUiStatut = s => s === 'ABSENT' ? 'ABSENT_NON_JUSTIFIE' : s === 'EXCUSE' ? 'ABSENT_JUSTIFIE' : s
+const mapEleve = e => ({ id: String(e.id), apiId: e.id, nom: e.nom, prenom: e.prenom, matricule: e.matricule, classeId: e.classe ? String(e.classe) : '', statut: e.statut === 'INACTIF' ? 'ARCHIVE' : 'INSCRIT' })
+const mapClasse = c => ({ id: String(c.id), nom: c.nom, niveau: c.niveau })
 
 export default function Presences() {
   const { user } = useAuth()
   const isTeacher = user?.role === 'ENSEIGNANT'
+  const isDirecteur = user?.role === 'DIRECTEUR'
+
+  const statutsAffiches = isTeacher ? [
+    { key: 'PRESENT', label: 'Présent', icon: CheckCircle2, active: 'bg-sage text-white border-sage', base: 'bg-sage/8 border-sage/20 text-sage' },
+    { key: 'ABSENT_NON_JUSTIFIE', label: 'Absent', icon: XCircle, active: 'bg-coral text-white border-coral', base: 'bg-coral/8 border-coral/20 text-coral' }
+  ] : STATUTS;
 
   // Si c'est un enseignant, on trouve sa classe par défaut
+  const [classesData, setClassesData] = useState([])
+  const [elevesData, setElevesData] = useState([])
+  const [presenceRows, setPresenceRows] = useState([])
+
   const maClasseId = useMemo(() => {
-    if (!isTeacher) return classes[0].id
-    return classes.find(c => c.enseignantId === user.id)?.id || classes[0].id
-  }, [isTeacher, user])
+    if (!isTeacher) return classesData[0]?.id || ''
+    return classesData.find(c => c.enseignantId === user?.id)?.id || classesData[0]?.id || ''
+  }, [isTeacher, user, classesData])
 
   const [classeId, setClasseId] = useState(maClasseId)
   const [date, setDate]         = useState(new Date().toISOString().split('T')[0])
   const [appel, setAppel]       = useState({})
   const [confirmed, setConfirmed] = useState(false)
 
+  useEffect(() => {
+    let mounted = true
+    Promise.all([list('/eleves/'), list('/ecole/classes/'), list('/presences/')])
+      .then(([elevesApi, classesApi, presencesApi]) => {
+        if (!mounted) return
+        setElevesData(elevesApi.map(mapEleve))
+        const nextClasses = classesApi.map(mapClasse)
+        setClassesData(nextClasses)
+        setClasseId(v => v || nextClasses[0]?.id || '')
+        setPresenceRows(presencesApi.map(p => ({ id: p.id, eleveId: String(p.eleve), date: p.date, statut: toUiStatut(p.statut), motif: p.motif })))
+      })
+      .catch(error => console.error('Chargement présences API impossible:', error))
+    return () => { mounted = false }
+  }, [])
+
   const presenceInit = useMemo(() => {
     const map = {}
-    initPresences.filter(p => p.classeId === classeId).forEach(p => { map[p.eleveId] = p.statut })
+    presenceRows.filter(p => p.date === date).forEach(p => { 
+      map[p.eleveId] = { statut: p.statut, motif: p.motif || '' } 
+    })
     return map
-  }, [classeId])
+  }, [presenceRows, date])
 
   const elevesClasse = useMemo(
-    () => eleves.filter(e => e.classeId === classeId && e.statut !== 'ARCHIVE'),
-    [classeId]
+    () => elevesData.filter(e => e.classeId === classeId && e.statut !== 'ARCHIVE'),
+    [classeId, elevesData]
   )
 
-  const getStatut = id => appel[id] || presenceInit[id] || null
-  const setStatut = (id, statut) => { setAppel(v => ({ ...v, [id]: statut })); setConfirmed(false) }
+  const getStatut = id => appel[id]?.statut || presenceInit[id]?.statut || null
+  const getMotif = id => appel[id]?.motif || presenceInit[id]?.motif || ''
+  
+  const setStatut = (id, statut) => { 
+    setAppel(v => ({ ...v, [id]: { ...(v[id] || { motif: getMotif(id) }), statut } })); 
+    setConfirmed(false) 
+  }
+  
+  const saveAppel = async () => {
+    const entries = Object.entries(appel)
+    for (const [eleveId, data] of entries) {
+      const existing = presenceRows.find(p => p.eleveId === String(eleveId) && p.date === date)
+      const body = { 
+        eleve: Number(eleveId), 
+        date, 
+        statut: toApiStatut(data.statut),
+        motif: data.motif || ''
+      }
+      const saved = existing ? await update(`/presences/${existing.id}/`, body) : await create('/presences/', body)
+      setPresenceRows(rows => {
+        const mapped = { 
+          id: saved.id, 
+          eleveId: String(saved.eleve), 
+          date: saved.date, 
+          statut: toUiStatut(saved.statut),
+          motif: saved.motif 
+        }
+        return existing ? rows.map(r => r.id === existing.id ? mapped : r) : [...rows, mapped]
+      })
+    }
+    setConfirmed(true)
+  }
 
   const markAllPresent = () => {
     const newAppel = {}
@@ -64,18 +125,22 @@ export default function Presences() {
         <div>
           <h1 className="font-display text-2xl font-bold text-navy">Présences et Appel</h1>
         </div>
-        <select className="input-base w-auto" value={classeId} onChange={e => { setClasseId(e.target.value); setAppel({}) }}>
-          {classes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-        </select>
+        {!isTeacher && (
+          <select className="input-base w-auto" value={classeId} onChange={e => { setClasseId(e.target.value); setAppel({}) }}>
+            {classesData.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+          </select>
+        )}
         <input type="date" className="input-base w-auto" value={date} onChange={e => setDate(e.target.value)} />
-        <div className="ml-auto flex gap-2">
-          <button onClick={markAllPresent} className="btn-amber text-xs">
-            <CheckCircle2 size={14} /> Tout le monde est présent
-          </button>
-          <button onClick={() => setConfirmed(true)} className={confirmed ? 'btn-amber' : 'btn-primary'}>
-            <Save size={15} /> {confirmed ? 'Appel confirmé' : "Confirmer l'appel"}
-          </button>
-        </div>
+        {!isDirecteur && (
+          <div className="ml-auto flex gap-2">
+            <button onClick={markAllPresent} className="btn-amber text-xs">
+              <CheckCircle2 size={14} /> Tout le monde est présent
+            </button>
+            <button onClick={saveAppel} className={confirmed ? 'btn-amber' : 'btn-primary'}>
+              {confirmed ? '✅ Confirmé' : "👍 Valider l'appel"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -112,19 +177,43 @@ export default function Presences() {
                   <div>
                     <p className="font-semibold text-navy text-sm">{eleve.nom} {eleve.prenom}</p>
                     <p className="text-xs text-slate">{eleve.matricule}</p>
+                    {statut && statut !== 'PRESENT' && !isDirecteur && (
+                      <input 
+                        className="input-base text-[10px] py-1 mt-1 h-6" 
+                        placeholder="Motif (ex: Certificat médical...)" 
+                        value={getMotif(eleve.id)} 
+                        onChange={e => setAppel(v => ({ ...v, [eleve.id]: { ...(v[eleve.id] || { statut }), motif: e.target.value } }))}
+                      />
+                    )}
+                    {statut && statut !== 'PRESENT' && isDirecteur && getMotif(eleve.id) && (
+                       <p className="text-[10px] text-coral font-medium mt-1 italic">Motif: {getMotif(eleve.id)}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-1.5 flex-shrink-0">
-                  {STATUTS.map(s => (
-                    <button
-                      key={s.key}
-                      onClick={() => setStatut(eleve.id, s.key)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${statut === s.key ? s.active : s.base + ' hover:opacity-80'}`}
-                    >
-                      <s.icon size={13} />
-                      <span className="hidden sm:inline">{s.label}</span>
-                    </button>
-                  ))}
+                  {isDirecteur ? (
+                    (() => {
+                      const s = STATUTS.find(st => st.key === statut)
+                      if (!s) return <span className="text-slate text-xs italic">Non renseigné</span>
+                      return (
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold ${s.active}`}>
+                          <s.icon size={13} />
+                          <span className="hidden sm:inline">{s.label}</span>
+                        </div>
+                      )
+                    })()
+                  ) : (
+                    statutsAffiches.map(s => (
+                      <button
+                        key={s.key}
+                        onClick={() => setStatut(eleve.id, s.key)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${statut === s.key ? s.active : s.base + ' hover:opacity-80'}`}
+                      >
+                        <s.icon size={13} />
+                        <span className="hidden sm:inline">{s.label}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             )
@@ -132,16 +221,18 @@ export default function Presences() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between bg-navy/5 rounded-xl px-5 py-3">
-        <div className="flex gap-5 text-sm">
-          <span className="flex items-center gap-1.5 text-sage font-semibold"><span className="w-2 h-2 bg-sage rounded-full" /> {stats.presents} Présents</span>
-          <span className="flex items-center gap-1.5 text-coral font-semibold"><span className="w-2 h-2 bg-coral rounded-full" /> {stats.absents} Absents</span>
-          <span className="flex items-center gap-1.5 text-amber-dark font-semibold"><span className="w-2 h-2 bg-amber rounded-full" /> {stats.retards} Retard</span>
+      {!isDirecteur && (
+        <div className="flex items-center justify-between bg-navy/5 rounded-xl px-5 py-3">
+          <div className="flex gap-5 text-sm">
+            <span className="flex items-center gap-1.5 text-sage font-semibold"><span className="w-2 h-2 bg-sage rounded-full" /> {stats.presents} Présents</span>
+            <span className="flex items-center gap-1.5 text-coral font-semibold"><span className="w-2 h-2 bg-coral rounded-full" /> {stats.absents} Absents</span>
+            {!isTeacher && <span className="flex items-center gap-1.5 text-amber-dark font-semibold"><span className="w-2 h-2 bg-amber rounded-full" /> {stats.retards} Retard</span>}
+          </div>
+          <button onClick={saveAppel} className="btn-primary text-xs">
+            {confirmed ? '✅ Confirmé' : "👍 Valider l'appel"}
+          </button>
         </div>
-        <button onClick={() => setConfirmed(true)} className="btn-primary text-xs">
-          <Save size={13} /> {confirmed ? 'Confirmé' : "Confirmer l'appel"}
-        </button>
-      </div>
+      )}
     </div>
   )
 }

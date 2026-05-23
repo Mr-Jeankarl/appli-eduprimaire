@@ -7,7 +7,10 @@ from .serializers import (
     EcoleSerializer, ConfigModuleSerializer,
     PosteScolariteSerializer, ClasseSerializer, MatiereSerializer
 )
+from .serializers import InvitationSerializer
+from .models import Invitation
 from apps.accounts.permissions import IsAdminOrDirecteur, PeutGererModules
+from .utils import resolve_ecole
 
 
 class EcoleView(generics.RetrieveUpdateAPIView):
@@ -15,8 +18,7 @@ class EcoleView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
-        return ecole
+        return resolve_ecole(self.request)
 
 
 class ModulesListView(generics.ListAPIView):
@@ -25,7 +27,7 @@ class ModulesListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         # Créer les configs manquantes
         for module in Module.values:
             ConfigModule.objects.get_or_create(ecole=ecole, module=module)
@@ -41,7 +43,7 @@ def toggle_module(request, module_code):
             {'error': f'Le module "{module_code}" est obligatoire et ne peut pas être désactivé.'},
             status=status.HTTP_400_BAD_REQUEST
         )
-    ecole, _ = Ecole.objects.get_or_create(pk=1)
+    ecole = resolve_ecole(request)
     config, _ = ConfigModule.objects.get_or_create(ecole=ecole, module=module_code)
     actif = request.data.get('actif')
     if actif is None:
@@ -58,11 +60,11 @@ class PosteScolariteListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAdminOrDirecteur]
 
     def get_queryset(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         return PosteScolarite.objects.filter(ecole=ecole)
 
     def perform_create(self, serializer):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         serializer.save(ecole=ecole)
 
 
@@ -71,7 +73,7 @@ class PosteScolariteDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrDirecteur]
 
     def get_queryset(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         return PosteScolarite.objects.filter(ecole=ecole)
 
 
@@ -80,11 +82,11 @@ class ClasseListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         return Classe.objects.filter(ecole=ecole)
 
     def perform_create(self, serializer):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         serializer.save(ecole=ecole)
 
 
@@ -93,7 +95,7 @@ class ClasseDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAdminOrDirecteur]
 
     def get_queryset(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         return Classe.objects.filter(ecole=ecole)
 
 
@@ -102,9 +104,42 @@ class MatiereListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         return Matiere.objects.filter(ecole=ecole)
 
     def perform_create(self, serializer):
-        ecole, _ = Ecole.objects.get_or_create(pk=1)
+        ecole = resolve_ecole(self.request)
         serializer.save(ecole=ecole)
+
+
+class InvitationListCreateView(generics.ListCreateAPIView):
+    """Lister/créer des codes d'invitation pour l'école de l'utilisateur."""
+    serializer_class = InvitationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Retourne les invitations pour l'école associée à l'utilisateur
+        ecole = resolve_ecole(self.request)
+        return Invitation.objects.filter(ecole=ecole)
+
+    def perform_create(self, serializer):
+        ecole = resolve_ecole(self.request)
+        # Générer un code si non fourni
+        import random, string
+        code = serializer.validated_data.get('code') or ('INVITE-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)))
+        serializer.save(ecole=ecole, code=code)
+
+
+@api_view(['GET'])
+def validate_invite(request, code):
+    try:
+        inv = Invitation.objects.filter(code=code, utilise=False).first()
+        if not inv:
+            return Response({'valid': False}, status=status.HTTP_404_NOT_FOUND)
+        # check expiry
+        from django.utils import timezone
+        if inv.expire_le and inv.expire_le < timezone.now():
+            return Response({'valid': False, 'expired': True}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'valid': True, 'ecole': EcoleSerializer(inv.ecole).data})
+    except Exception:
+        return Response({'valid': False}, status=status.HTTP_400_BAD_REQUEST)

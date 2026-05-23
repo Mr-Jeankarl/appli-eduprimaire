@@ -1,12 +1,16 @@
-import { useState, useMemo } from 'react'
-import { Plus, Search, BookOpen, RotateCcw, Edit2, Trash2, AlertTriangle } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Plus, Search, BookOpen, RotateCcw, Edit2, Trash2, AlertTriangle, Eye } from 'lucide-react'
 import { livres as initLivres, emprunts as initEmprunts, eleves } from '../../data/mockData'
 import { Avatar } from '../../components/ui/index'
 import Modal from '../../components/ui/Modal'
+import { useAuth } from '../../context/AuthContext'
+import { create, list, remove, update } from '../../services/api'
 
 const CATS = ['Manuels', 'Littérature', 'Jeunesse', 'Histoire', 'Sciences', 'Autre']
 const statutClass = s => s === 'EN_COURS' ? 'badge-green' : s === 'EN_RETARD' ? 'badge-red' : 'badge-slate'
 const statutLabel = s => s === 'EN_COURS' ? 'En cours' : s === 'EN_RETARD' ? 'En retard' : 'Rendu'
+const mapLivre = l => ({ id: String(l.id), apiId: l.id, titre: l.titre, auteur: l.auteur, isbn: l.isbn, editeur: l.editeur, annee: l.annee, categorie: l.categorie, stockTotal: l.stock_total, stockDispo: l.stock_dispo })
+const mapEmprunt = e => ({ id: String(e.id), apiId: e.id, livreId: String(e.livre), eleveId: String(e.eleve), dateEmprunt: e.date_emprunt, dateRetourPrevue: e.date_retour_prevue, dateRetourReelle: e.date_retour_reelle, statut: e.statut })
 
 function LivreForm({ initial = {}, onSubmit, onCancel }) {
   const [form, setForm] = useState({ titre: '', auteur: '', isbn: '', editeur: '', annee: '', categorie: 'Manuels', stockTotal: 1, stockDispo: 1, ...initial })
@@ -31,7 +35,8 @@ function LivreForm({ initial = {}, onSubmit, onCancel }) {
   )
 }
 
-function EmpruntForm({ livres, onSubmit, onCancel }) {
+function EmpruntForm({ livres, elevesOptions = eleves, onSubmit, onCancel }) {
+  const eleves = elevesOptions
   const [form, setForm] = useState({ livreId: '', eleveId: '', dateEmprunt: new Date().toISOString().split('T')[0], dateRetourPrevue: '' })
   const set = k => e => setForm(v => ({ ...v, [k]: e.target.value }))
   return (
@@ -63,15 +68,33 @@ function EmpruntForm({ livres, onSubmit, onCancel }) {
 }
 
 export default function Bibliotheque() {
+  const { user } = useAuth()
+  const isDirecteur = user?.role === 'DIRECTEUR'
+  const isReadOnly = isDirecteur
+
   const [onglet, setOnglet]     = useState('catalogue')
   const [livres, setLivres]     = useState(initLivres)
   const [emprunts, setEmprunts] = useState(initEmprunts)
+  const [elevesOptions, setElevesOptions] = useState(eleves)
   const [search, setSearch]     = useState('')
   const [filtreCat, setFiltreCat] = useState('')
   const [modalLivre, setModalLivre]   = useState(false)
   const [modalEdit, setModalEdit]     = useState(null)
   const [modalEmprunt, setModalEmprunt] = useState(false)
   const [modalDel, setModalDel]       = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    Promise.all([list('/bibliotheque/livres/'), list('/bibliotheque/emprunts/'), list('/eleves/')])
+      .then(([livresApi, empruntsApi, elevesApi]) => {
+        if (!mounted) return
+        setLivres(livresApi.map(mapLivre))
+        setEmprunts(empruntsApi.map(mapEmprunt))
+        setElevesOptions(elevesApi.map(e => ({ id: String(e.id), nom: e.nom, prenom: e.prenom, matricule: e.matricule, statut: e.statut === 'INACTIF' ? 'ARCHIVE' : 'INSCRIT' })))
+      })
+      .catch(error => console.error('Chargement bibliothèque API impossible:', error))
+    return () => { mounted = false }
+  }, [])
 
   const getEleve = id => eleves.find(e => e.id === id)
   const getLivre = id => livres.find(l => l.id === id)
@@ -82,17 +105,33 @@ export default function Bibliotheque() {
     return (!q || l.titre.toLowerCase().includes(q) || (l.auteur || '').toLowerCase().includes(q)) && (!filtreCat || l.categorie === filtreCat)
   }), [livres, search, filtreCat])
 
-  const handleAjoutLivre   = data => { setLivres(v => [...v, { ...data, id: `liv-${Date.now()}`, stockTotal: Number(data.stockTotal), stockDispo: Number(data.stockDispo) }]); setModalLivre(false) }
-  const handleEditLivre    = data => { setLivres(v => v.map(l => l.id === data.id ? { ...data, stockTotal: Number(data.stockTotal), stockDispo: Number(data.stockDispo) } : l)); setModalEdit(null) }
-  const handleDelLivre     = ()   => { setLivres(v => v.filter(l => l.id !== modalDel.id)); setModalDel(null) }
-  const handleAjoutEmprunt = data => {
-    setEmprunts(v => [...v, { ...data, id: `emp-${Date.now()}`, statut: 'EN_COURS', dateRetourReelle: null }])
+  const livrePayload = data => ({ titre: data.titre, auteur: data.auteur, isbn: data.isbn, editeur: data.editeur, annee: data.annee ? Number(data.annee) : null, categorie: data.categorie, stock_total: Number(data.stockTotal), stock_dispo: Number(data.stockDispo) })
+  const handleAjoutLivre = async data => {
+    const saved = await create('/bibliotheque/livres/', livrePayload(data))
+    setLivres(v => [...v, mapLivre(saved)])
+    setModalLivre(false)
+  }
+  const handleEditLivre = async data => {
+    const saved = await update(`/bibliotheque/livres/${data.apiId || data.id}/`, livrePayload(data))
+    setLivres(v => v.map(l => l.id === data.id ? mapLivre(saved) : l))
+    setModalEdit(null)
+  }
+  const handleDelLivre = async () => {
+    await remove(`/bibliotheque/livres/${modalDel.apiId || modalDel.id}/`)
+    setLivres(v => v.filter(l => l.id !== modalDel.id))
+    setModalDel(null)
+  }
+  const handleAjoutEmprunt = async data => {
+    const saved = await create('/bibliotheque/emprunts/', { livre: Number(data.livreId), eleve: Number(data.eleveId), date_emprunt: data.dateEmprunt, date_retour_prevue: data.dateRetourPrevue, statut: 'EN_COURS' })
+    setEmprunts(v => [...v, mapEmprunt(saved)])
     setLivres(v => v.map(l => l.id === data.livreId ? { ...l, stockDispo: l.stockDispo - 1 } : l))
     setModalEmprunt(false)
   }
-  const handleRetour = id => {
+  const handleRetour = async id => {
     const emp = emprunts.find(e => e.id === id)
-    setEmprunts(v => v.map(e => e.id === id ? { ...e, statut: 'RENDU', dateRetourReelle: new Date().toISOString().split('T')[0] } : e))
+    const retour = new Date().toISOString().split('T')[0]
+    await update(`/bibliotheque/emprunts/${emp.apiId || id}/`, { statut: 'RENDU', date_retour_reelle: retour })
+    setEmprunts(v => v.map(e => e.id === id ? { ...e, statut: 'RENDU', dateRetourReelle: retour } : e))
     if (emp) setLivres(v => v.map(l => l.id === emp.livreId ? { ...l, stockDispo: l.stockDispo + 1 } : l))
   }
 
@@ -100,10 +139,17 @@ export default function Bibliotheque() {
     <div className="p-6 space-y-5 page-enter">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div><h1 className="font-display text-2xl font-bold text-navy">Bibliothèque</h1><p className="text-slate text-sm">{livres.length} ouvrages · {emprunts.filter(e => e.statut !== 'RENDU').length} emprunts en cours</p></div>
-        <div className="flex gap-2">
-          <button onClick={() => setModalEmprunt(true)} className="btn-ghost"><BookOpen size={15} /> Nouvel emprunt</button>
-          <button onClick={() => setModalLivre(true)}   className="btn-primary"><Plus size={15} /> Ajouter un livre</button>
-        </div>
+        {!isReadOnly && (
+          <div className="flex gap-2">
+            <button onClick={() => setModalEmprunt(true)} className="btn-ghost"><BookOpen size={15} /> Nouvel emprunt</button>
+            <button onClick={() => setModalLivre(true)}   className="btn-primary"><Plus size={15} /> Ajouter un livre</button>
+          </div>
+        )}
+        {isReadOnly && (
+          <div className="flex items-center gap-2 text-xs text-slate bg-beige/60 border border-beige-dark rounded-lg px-3 py-2">
+            <Eye size={14} className="text-amber-dark" /> Mode consultation
+          </div>
+        )}
       </div>
 
       {enRetard.length > 0 && (
@@ -148,10 +194,12 @@ export default function Bibliotheque() {
                 <div className="h-1 bg-beige-dark rounded-full overflow-hidden">
                   <div className="h-full bg-amber rounded-full" style={{ width: (livre.stockDispo / livre.stockTotal * 100) + '%' }} />
                 </div>
-                <div className="flex gap-1.5 justify-end">
-                  <button onClick={() => setModalEdit(livre)} className="text-slate hover:text-navy p-1 rounded transition"><Edit2 size={13} /></button>
-                  <button onClick={() => setModalDel(livre)}  className="text-slate hover:text-coral p-1 rounded transition"><Trash2 size={13} /></button>
-                </div>
+                {!isReadOnly && (
+                  <div className="flex gap-1.5 justify-end">
+                    <button onClick={() => setModalEdit(livre)} className="text-slate hover:text-navy p-1 rounded transition"><Edit2 size={13} /></button>
+                    <button onClick={() => setModalDel(livre)}  className="text-slate hover:text-coral p-1 rounded transition"><Trash2 size={13} /></button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -180,10 +228,13 @@ export default function Bibliotheque() {
                     <td className="px-4 py-3 text-xs text-slate">{emp.dateRetourPrevue}</td>
                     <td className="px-4 py-3"><span className={statutClass(emp.statut) + ' text-[11px]'}>{statutLabel(emp.statut)}</span></td>
                     <td className="px-4 py-3">
-                      {emp.statut !== 'RENDU' && (
+                      {emp.statut !== 'RENDU' && !isReadOnly && (
                         <button onClick={() => handleRetour(emp.id)} className="flex items-center gap-1.5 text-xs font-semibold text-sage hover:underline">
                           <RotateCcw size={12} /> Retour
                         </button>
+                      )}
+                      {emp.statut !== 'RENDU' && isReadOnly && (
+                        <span className="text-xs text-amber-dark font-semibold">En cours</span>
                       )}
                     </td>
                   </tr>
@@ -196,7 +247,7 @@ export default function Bibliotheque() {
 
       <Modal open={modalLivre}    onClose={() => setModalLivre(false)}    title="Ajouter un livre"    size="md"><LivreForm onSubmit={handleAjoutLivre} onCancel={() => setModalLivre(false)} /></Modal>
       <Modal open={!!modalEdit}   onClose={() => setModalEdit(null)}   title="Modifier le livre"   size="md">{modalEdit && <LivreForm initial={modalEdit} onSubmit={handleEditLivre} onCancel={() => setModalEdit(null)} />}</Modal>
-      <Modal open={modalEmprunt}  onClose={() => setModalEmprunt(false)}  title="Nouvel emprunt"      size="md"><EmpruntForm livres={livres} onSubmit={handleAjoutEmprunt} onCancel={() => setModalEmprunt(false)} /></Modal>
+      <Modal open={modalEmprunt}  onClose={() => setModalEmprunt(false)}  title="Nouvel emprunt"      size="md"><EmpruntForm livres={livres} elevesOptions={elevesOptions} onSubmit={handleAjoutEmprunt} onCancel={() => setModalEmprunt(false)} /></Modal>
       <Modal open={!!modalDel}    onClose={() => setModalDel(null)}    title="Supprimer le livre"  size="sm">
         {modalDel && <div className="space-y-4"><p className="text-sm text-slate">Supprimer <strong className="text-navy">"{modalDel.titre}"</strong> ?</p><div className="flex justify-end gap-3"><button onClick={() => setModalDel(null)} className="btn-ghost">Annuler</button><button onClick={handleDelLivre} className="btn-danger">Supprimer</button></div></div>}
       </Modal>

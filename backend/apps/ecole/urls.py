@@ -10,4 +10,6 @@ urlpatterns = [
     path('classes/', views.ClasseListCreateView.as_view(), name='classes-list'),
     path('classes/<int:pk>/', views.ClasseDetailView.as_view(), name='classe-detail'),
     path('matieres/', views.MatiereListCreateView.as_view(), name='matieres-list'),
+    path('invitations/', views.InvitationListCreateView.as_view(), name='invitations-list'),
+    path('invitations/validate/<str:code>/', views.validate_invite, name='invitations-validate'),
 ]

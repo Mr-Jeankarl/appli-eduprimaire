@@ -18,7 +18,9 @@ class DossierListCreateView(generics.ListCreateAPIView):
         return DossierInscriptionSerializer
 
     def get_queryset(self):
-        qs = DossierInscription.objects.select_related('classe_souhaitee', 'cree_par')
+        from apps.ecole.utils import resolve_ecole
+        ecole = resolve_ecole(self.request)
+        qs = DossierInscription.objects.select_related('classe_souhaitee', 'cree_par').filter(classe_souhaitee__ecole=ecole)
         statut = self.request.query_params.get('statut')
         if statut:
             qs = qs.filter(statut=statut)
@@ -29,9 +31,13 @@ class DossierListCreateView(generics.ListCreateAPIView):
 
 
 class DossierDetailView(generics.RetrieveUpdateAPIView):
-    queryset = DossierInscription.objects.all()
     serializer_class = DossierInscriptionSerializer
     permission_classes = [IsSecretaire]
+
+    def get_queryset(self):
+        from apps.ecole.utils import resolve_ecole
+        ecole = resolve_ecole(self.request)
+        return DossierInscription.objects.select_related('classe_souhaitee', 'cree_par').filter(classe_souhaitee__ecole=ecole)
 
 
 @api_view(['POST'])

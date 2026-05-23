@@ -5,15 +5,24 @@ from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     nom_complet = serializers.ReadOnlyField()
+    ecole_id = serializers.SerializerMethodField()
+    ecole_nom = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'nom', 'prenom', 'nom_complet',
             'role', 'telephone', 'photo', 'is_active',
+            'ecole_id', 'ecole_nom',
             'peut_gerer_modules', 'date_creation'
         ]
         read_only_fields = ['id', 'date_creation']
+
+    def get_ecole_id(self, obj):
+        return obj.ecole.id if obj.ecole else None
+
+    def get_ecole_nom(self, obj):
+        return obj.ecole.nom if obj.ecole else None
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

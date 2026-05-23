@@ -70,3 +70,38 @@ class Eleve(models.Model):
         annee = annee_scolaire.replace('-', '')[:6]
         dernier = cls.objects.filter(annee_scolaire=annee_scolaire).count() + 1
         return f"EL{annee}{dernier:04d}"
+
+
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+@receiver(post_save, sender=Eleve)
+def creer_scolarite_pour_nouvel_eleve(sender, instance, created, **kwargs):
+    if created:
+        from apps.comptabilite.models import ScolariteEleve, DetailScolarite
+        from apps.ecole.models import PosteScolarite
+        
+        # Trouver ou créer ScolariteEleve
+        ecole = instance.classe.ecole if instance.classe else None
+        
+        # Récupérer les postes de scolarité associés à cette école
+        postes = PosteScolarite.objects.filter(ecole=ecole) if ecole else PosteScolarite.objects.all()
+        
+        scol = ScolariteEleve.objects.create(
+            eleve=instance,
+            annee_scolaire=instance.annee_scolaire or '2024-2025',
+            montant_total=0
+        )
+        
+        total = 0
+        for poste in postes:
+            DetailScolarite.objects.create(
+                scolarite=scol,
+                poste=poste,
+                montant_du=poste.montant,
+                montant_paye=0
+            )
+            total += poste.montant
+            
+        scol.montant_total = total
+        scol.save()

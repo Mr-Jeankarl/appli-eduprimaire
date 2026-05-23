@@ -22,6 +22,7 @@ urlpatterns = [
     path('api/comptabilite/', include('apps.comptabilite.urls')),
     path('api/emploi-du-temps/', include('apps.emploi_du_temps.urls')),
     path('api/messagerie/', include('apps.messagerie.urls')),
+    path('api/notifications/', include('apps.notifications.urls')),
     path('api/bibliotheque/', include('apps.bibliotheque.urls')),
     path('api/portail-parent/', include('apps.portail_parent.urls')),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

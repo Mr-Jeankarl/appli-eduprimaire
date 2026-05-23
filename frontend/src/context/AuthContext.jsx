@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { utilisateurs } from '../data/mockData'
+import { apiRequest, clearTokens, getAccessToken, loginApi, logoutApi } from '../services/api'
 
 const AuthContext = createContext()
 
@@ -8,42 +8,62 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Vérifier s'il y a un utilisateur dans le localStorage
     const storedUser = localStorage.getItem('eduprimaire_user')
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
+    if (!getAccessToken()) {
+      setLoading(false)
+      return
     }
-    setLoading(false)
+    apiRequest('/auth/me/')
+      .then(profile => {
+        const cached = storedUser ? JSON.parse(storedUser) : null
+        setUser(formatUser(profile || cached))
+      })
+      .catch(() => {
+        clearTokens()
+        localStorage.removeItem('eduprimaire_user')
+      })
+      .finally(() => setLoading(false))
   }, [])
 
-  const login = (email, password) => {
-    // Simulation basique : n'importe quel mot de passe fonctionne pour les emails existants dans la mockData
-    const foundUser = utilisateurs.find(u => u.email === email)
-    if (foundUser) {
-      // Formater l'utilisateur pour correspondre à la structure attendue
-      const loggedUser = {
-        id: foundUser.id,
-        nom: foundUser.nom,
-        prenom: foundUser.prenom,
-        email: foundUser.email,
-        role: foundUser.role,
-        roleLabel: foundUser.role.charAt(0) + foundUser.role.slice(1).toLowerCase(),
-        initiales: `${foundUser.prenom.charAt(0)}${foundUser.nom.charAt(0)}`.toUpperCase()
-      }
+  const formatUser = data => ({
+    id: data.id,
+    nom: data.nom,
+    prenom: data.prenom,
+    email: data.email,
+    role: data.role,
+    roleLabel: data.role?.charAt(0) + data.role?.slice(1).toLowerCase(),
+    initiales: `${data.prenom?.charAt(0) || ''}${data.nom?.charAt(0) || ''}`.toUpperCase(),
+    peutGererModules: data.peut_gerer_modules,
+    ecoleId: data.ecole_id,
+    ecoleNom: data.ecole_nom,
+  })
+
+  const login = async (email, password) => {
+    try {
+      const result = await loginApi(email, password)
+      const loggedUser = formatUser(result.user)
       setUser(loggedUser)
       localStorage.setItem('eduprimaire_user', JSON.stringify(loggedUser))
       return { success: true }
+    } catch (error) {
+      return { success: false, message: error.message || "Email ou mot de passe incorrect." }
     }
-    return { success: false, message: "Email incorrect ou introuvable." }
   }
 
-  const logout = () => {
+  const logout = async () => {
+    await logoutApi()
     setUser(null)
     localStorage.removeItem('eduprimaire_user')
   }
 
+  const updateUserData = (newData) => {
+    const updated = formatUser(newData)
+    setUser(updated)
+    localStorage.setItem('eduprimaire_user', JSON.stringify(updated))
+  }
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, updateUserData, loading }}>
       {children}
     </AuthContext.Provider>
   )

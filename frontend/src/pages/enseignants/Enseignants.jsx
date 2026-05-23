@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Plus, Search, Edit2, Trash2, Phone, Mail } from 'lucide-react'
 import { enseignants as initEns, classes, matieres } from '../../data/mockData'
 import { Avatar } from '../../components/ui/index'
 import Modal from '../../components/ui/Modal'
+import { create, list, remove, update } from '../../services/api'
 
 const INIT = { nom: '', prenom: '', email: '', telephone: '', specialite: '', classeId: '', matricule: '', dateEmbauche: '', matieres: [] }
 
@@ -55,6 +56,19 @@ export default function Enseignants() {
   const [modalEdit, setModalEdit]   = useState(false)
   const [modalDel, setModalDel]     = useState(false)
 
+  useEffect(() => {
+    let mounted = true
+    list('/enseignants/')
+      .then(items => {
+        if (!mounted) return
+        const next = items.map(e => ({ id: String(e.id), apiId: e.id, userId: e.user, nom: e.nom, prenom: e.prenom, email: e.email, telephone: e.telephone, matricule: e.matricule || '', classeId: '', matieres: [] }))
+        setListe(next)
+        setSelected(next[0] || null)
+      })
+      .catch(error => console.error('Chargement enseignants API impossible:', error))
+    return () => { mounted = false }
+  }, [])
+
   const filtered = useMemo(() => liste.filter(e => {
     const q = search.toLowerCase()
     return !q || e.nom.toLowerCase().includes(q) || e.prenom.toLowerCase().includes(q) || e.email.toLowerCase().includes(q)
@@ -63,9 +77,22 @@ export default function Enseignants() {
   const getClasse   = id  => classes.find(c => c.id === id)
   const getMatieres = ids => matieres.filter(m => (ids || []).includes(m.id))
 
-  const handleAjout = data => { const n = { ...data, id: `ens-${Date.now()}` }; setListe(v => [...v, n]); setSelected(n); setModalAjout(false) }
-  const handleEdit  = data => { setListe(v => v.map(e => e.id === data.id ? data : e)); setSelected(data); setModalEdit(false) }
-  const handleDel   = ()   => { setListe(v => v.filter(e => e.id !== selected.id)); setSelected(liste.find(e => e.id !== selected.id) || null); setModalDel(false) }
+  const handleAjout = async data => {
+    const user = await create('/auth/utilisateurs/', { nom: data.nom, prenom: data.prenom, email: data.email, telephone: data.telephone || '', role: 'ENSEIGNANT', password: 'password123', password_confirm: 'password123' })
+    const saved = await create('/enseignants/', { user: user.id, matricule: data.matricule || `ENS-${Date.now()}` })
+    const n = { ...data, id: String(saved.id), apiId: saved.id, userId: user.id }
+    setListe(v => [...v, n]); setSelected(n); setModalAjout(false)
+  }
+  const handleEdit = async data => {
+    if (data.userId) await update(`/auth/utilisateurs/${data.userId}/`, { nom: data.nom, prenom: data.prenom, email: data.email, telephone: data.telephone || '', role: 'ENSEIGNANT' })
+    const saved = await update(`/enseignants/${data.apiId || data.id}/`, { user: data.userId, matricule: data.matricule })
+    const n = { ...data, apiId: saved.id }
+    setListe(v => v.map(e => e.id === data.id ? n : e)); setSelected(n); setModalEdit(false)
+  }
+  const handleDel = async () => {
+    await remove(`/enseignants/${selected.apiId || selected.id}/`)
+    setListe(v => v.filter(e => e.id !== selected.id)); setSelected(liste.find(e => e.id !== selected.id) || null); setModalDel(false)
+  }
 
   return (
     <div className="flex h-full page-enter">

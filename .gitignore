@@ -1,6 +1,7 @@
 # Frontend
 frontend/node_modules/
 frontend/dist/
+frontend/build_error.log
 frontend/.env
 frontend/.env.local
 frontend/.env.development.local

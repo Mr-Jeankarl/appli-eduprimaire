@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Plus, Edit2, Trash2, AlertCircle } from 'lucide-react'
 import { emploiDuTemps as initEDT, enseignants, matieres, classes, eleves } from '../../data/mockData'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
+import { create, list, remove, update } from '../../services/api'
 
 const JOURS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
 const HEURES = ['07:30', '08:30', '09:30', '10:00', '11:00', '12:00', '14:00', '15:00', '16:00']
 
-function CreneauForm({ initial = {}, onSubmit, onCancel, edt, classeIdDefault }) {
+function CreneauForm({ initial = {}, onSubmit, onCancel, edt, classeIdDefault, classesOptions = classes, matieresOptions = matieres, enseignantsOptions = enseignants }) {
   const [form, setForm] = useState({ classeId: classeIdDefault || '', matiereId: '', enseignantId: '', jour: 1, heureDebut: '07:30', heureFin: '08:30', salle: '', ...initial })
   const set = k => e => setForm(v => ({ ...v, [k]: e.target.value }))
   const conflit = useMemo(() => edt.some(e =>
@@ -20,21 +21,21 @@ function CreneauForm({ initial = {}, onSubmit, onCancel, edt, classeIdDefault })
           <label className="text-xs font-semibold text-slate">Classe *</label>
           <select required className="input-base mt-1" value={form.classeId} onChange={set('classeId')}>
             <option value="">Sélectionner...</option>
-            {classes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+            {classesOptions.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
           </select>
         </div>
         <div>
           <label className="text-xs font-semibold text-slate">Matière *</label>
           <select required className="input-base mt-1" value={form.matiereId} onChange={set('matiereId')}>
             <option value="">Sélectionner...</option>
-            {matieres.map(m => <option key={m.id} value={m.id}>{m.nom}</option>)}
+            {matieresOptions.map(m => <option key={m.id} value={m.id}>{m.nom}</option>)}
           </select>
         </div>
         <div>
           <label className="text-xs font-semibold text-slate">Enseignant</label>
           <select className="input-base mt-1" value={form.enseignantId} onChange={set('enseignantId')}>
             <option value="">—</option>
-            {enseignants.map(e => <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>)}
+            {enseignantsOptions.map(e => <option key={e.id} value={e.id}>{e.prenom} {e.nom}</option>)}
           </select>
         </div>
         <div>
@@ -69,7 +70,8 @@ export default function EmploiDuTemps() {
   const { user } = useAuth()
   const isParent = user?.role === 'PARENT'
   const isTeacher = user?.role === 'ENSEIGNANT'
-  const isReadOnly = isParent || isTeacher
+  const isDirecteur = user?.role === 'DIRECTEUR'
+  const isReadOnly = isParent || isDirecteur
 
   // Si parent, on trouve la classe de son enfant
   const monEnfant = useMemo(() => {
@@ -84,6 +86,9 @@ export default function EmploiDuTemps() {
   }, [isTeacher, user])
 
   const [edt, setEdt]     = useState(initEDT)
+  const [classesData, setClassesData] = useState(classes)
+  const [matieresData, setMatieresData] = useState(matieres)
+  const [enseignantsData, setEnseignantsData] = useState(enseignants)
   const [classeId, setClasseId] = useState(
     isParent && monEnfant ? monEnfant.classeId :
     isTeacher && maClasseId ? maClasseId :
@@ -93,14 +98,34 @@ export default function EmploiDuTemps() {
   const [modalEdit, setModalEdit]   = useState(null)
   const [modalDel, setModalDel]     = useState(null)
 
+  useEffect(() => {
+    let mounted = true
+    Promise.all([list('/emploi-du-temps/'), list('/ecole/classes/'), list('/ecole/matieres/'), list('/enseignants/')])
+      .then(([edtApi, classesApi, matieresApi, enseignantsApi]) => {
+        if (!mounted) return
+        const nextClasses = classesApi.map(c => ({ id: String(c.id), nom: c.nom, niveau: c.niveau }))
+        const nextMatieres = matieresApi.map(m => ({ id: String(m.id), nom: m.nom, couleur: '#1E3A5F' }))
+        const nextEns = enseignantsApi.map(e => ({ id: String(e.id), prenom: e.prenom || e.user_detail?.prenom || '', nom: e.nom || e.user_detail?.nom || '' }))
+        setClassesData(nextClasses)
+        setMatieresData(nextMatieres)
+        setEnseignantsData(nextEns)
+        setEdt(edtApi.map(e => ({ id: String(e.id), apiId: e.id, classeId: String(e.classe), matiereId: String(e.matiere), enseignantId: e.enseignant ? String(e.enseignant) : '', jour: e.jour, heureDebut: e.heure_debut?.slice(0, 5), heureFin: e.heure_fin?.slice(0, 5), salle: e.salle })))
+        setClasseId(v => v || nextClasses[0]?.id || '')
+      })
+      .catch(error => console.error('Chargement emploi du temps API impossible:', error))
+    return () => { mounted = false }
+  }, [])
+
   const edtClasse = useMemo(() => edt.filter(e => e.classeId === classeId), [edt, classeId])
   const getCell   = (jour, heure) => edtClasse.find(e => Number(e.jour) === jour && e.heureDebut === heure)
-  const getMatiere = id => matieres.find(m => m.id === id)
-  const getEns     = id => enseignants.find(e => e.id === id)
+  const getMatiere = id => matieresData.find(m => m.id === id)
+  const getEns     = id => enseignantsData.find(e => e.id === id)
 
-  const handleAjout = data => { setEdt(v => [...v, { ...data, id: `edt-${Date.now()}`, jour: Number(data.jour) }]); setModalAjout(false) }
-  const handleEdit  = data => { setEdt(v => v.map(e => e.id === data.id ? { ...data, jour: Number(data.jour) } : e)); setModalEdit(null) }
-  const handleDel   = ()   => { setEdt(v => v.filter(e => e.id !== modalDel.id)); setModalDel(null) }
+  const payload = data => ({ classe: Number(data.classeId), matiere: Number(data.matiereId), enseignant: data.enseignantId ? Number(data.enseignantId) : null, jour: Number(data.jour), heure_debut: data.heureDebut, heure_fin: data.heureFin, salle: data.salle })
+  const mapSaved = e => ({ id: String(e.id), apiId: e.id, classeId: String(e.classe), matiereId: String(e.matiere), enseignantId: e.enseignant ? String(e.enseignant) : '', jour: e.jour, heureDebut: e.heure_debut?.slice(0, 5), heureFin: e.heure_fin?.slice(0, 5), salle: e.salle })
+  const handleAjout = async data => { const saved = await create('/emploi-du-temps/', payload(data)); setEdt(v => [...v, mapSaved(saved)]); setModalAjout(false) }
+  const handleEdit  = async data => { const saved = await update(`/emploi-du-temps/${data.apiId || data.id}/`, payload(data)); setEdt(v => v.map(e => e.id === data.id ? mapSaved(saved) : e)); setModalEdit(null) }
+  const handleDel   = async () => { await remove(`/emploi-du-temps/${modalDel.apiId || modalDel.id}/`); setEdt(v => v.filter(e => e.id !== modalDel.id)); setModalDel(null) }
 
   return (
     <div className="p-6 space-y-5 page-enter">
@@ -114,17 +139,12 @@ export default function EmploiDuTemps() {
           </p>
         </div>
         <div className="flex gap-3">
-          {!isParent && (
+          <button onClick={() => window.print()} className="btn-ghost">
+            📄 Exporter en PDF
+          </button>
+          {!isParent && !isTeacher && (
             <select className="input-base w-auto" value={classeId} onChange={e => setClasseId(e.target.value)}>
-              {isTeacher ? (
-                <>
-                  <option value={maClasseId}>{classes.find(c => c.id === maClasseId)?.nom || 'Ma classe'}</option>
-                  <option disabled>──────────────</option>
-                  {classes.filter(c => c.id !== maClasseId).map(c => <option key={c.id} value={c.id}>{c.nom} (consultation)</option>)}
-                </>
-              ) : (
-                classes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)
-              )}
+              {classesData.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
             </select>
           )}
           {!isReadOnly && (
@@ -181,8 +201,8 @@ export default function EmploiDuTemps() {
         ))}
       </div>
 
-      <Modal open={modalAjout}  onClose={() => setModalAjout(false)}  title="Ajouter un créneau" size="md"><CreneauForm onSubmit={handleAjout} onCancel={() => setModalAjout(false)} edt={edt} classeIdDefault={classeId} /></Modal>
-      <Modal open={!!modalEdit} onClose={() => setModalEdit(null)} title="Modifier le créneau" size="md">{modalEdit && <CreneauForm initial={modalEdit} onSubmit={handleEdit} onCancel={() => setModalEdit(null)} edt={edt} classeIdDefault={classeId} />}</Modal>
+      <Modal open={modalAjout}  onClose={() => setModalAjout(false)}  title="Ajouter un créneau" size="md"><CreneauForm onSubmit={handleAjout} onCancel={() => setModalAjout(false)} edt={edt} classeIdDefault={classeId} classesOptions={classesData} matieresOptions={matieresData} enseignantsOptions={enseignantsData} /></Modal>
+      <Modal open={!!modalEdit} onClose={() => setModalEdit(null)} title="Modifier le créneau" size="md">{modalEdit && <CreneauForm initial={modalEdit} onSubmit={handleEdit} onCancel={() => setModalEdit(null)} edt={edt} classeIdDefault={classeId} classesOptions={classesData} matieresOptions={matieresData} enseignantsOptions={enseignantsData} />}</Modal>
       <Modal open={!!modalDel}  onClose={() => setModalDel(null)}  title="Supprimer" size="sm">
         {modalDel && (
           <div className="space-y-4">

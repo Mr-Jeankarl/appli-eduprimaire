@@ -40,6 +40,7 @@ MODULES_OBLIGATOIRES = [
 
 class Ecole(models.Model):
     nom = models.CharField(max_length=200)
+    code = models.CharField(max_length=50, unique=True, null=True, blank=True)
     adresse = models.TextField(blank=True)
     telephone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
@@ -54,6 +55,16 @@ class Ecole(models.Model):
 
     def __str__(self):
         return self.nom
+
+    def save(self, *args, **kwargs):
+        # Générer un code unique si absent (ex: EDU-YYYY-XXXX)
+        if not self.code:
+            import random, string, datetime
+            year = datetime.date.today().year
+            suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+            self.code = f"EDU-{year}-{suffix}"
+            # En cas de collision, laisse la DB lever l'erreur (peu probable)
+        super().save(*args, **kwargs)
 
 
 class ConfigModule(models.Model):
@@ -134,3 +145,19 @@ class Matiere(models.Model):
 
     def __str__(self):
         return f"{self.nom} (coef. {self.coefficient})"
+
+
+class Invitation(models.Model):
+    """Code d'invitation pour rejoindre une école."""
+    ecole = models.ForeignKey(Ecole, on_delete=models.CASCADE, related_name='invitations')
+    code = models.CharField(max_length=50, unique=True)
+    cible_email = models.EmailField(blank=True, null=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+    expire_le = models.DateTimeField(null=True, blank=True)
+    utilise = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Invitation'
+
+    def __str__(self):
+        return f"{self.code} → {self.ecole.nom} ({'utilisé' if self.utilise else 'actif'})"

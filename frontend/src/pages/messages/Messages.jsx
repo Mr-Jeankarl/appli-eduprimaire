@@ -1,11 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Plus, Send, Inbox, CheckCheck, Clock, Megaphone } from 'lucide-react'
 import { messages as initMessages, classes, eleves } from '../../data/mockData'
 import Modal from '../../components/ui/Modal'
 import { Avatar } from '../../components/ui/index'
 import { useAuth } from '../../context/AuthContext'
+import { create, list, update } from '../../services/api'
 
 const ROLE_BADGE = { DIRECTEUR: 'badge-navy', ENSEIGNANT: 'badge-green', ADMIN: 'badge-red', COMPTABLE: 'badge-amber', PARENT: 'badge-coral' }
+const mapMessage = m => ({ id: String(m.id), apiId: m.id, expediteurNom: m.expediteur_nom || 'Utilisateur', expediteurRole: m.expediteur_role || 'ADMIN', destinataireNom: m.destinataire_nom, destinataireType: m.destinataire_type, classeId: m.classe ? String(m.classe) : null, objet: m.objet, contenu: m.contenu, date: (m.date_creation || '').slice(0, 10), lu: m.lu })
 
 function ComposeForm({ onSubmit, onCancel, isParent, isTeacher, isComptable, isDirecteur, maClasse }) {
   const defaultDest = isParent ? 'ecole' : isTeacher ? 'classe' : isComptable ? 'parents_impayes' : 'tous'
@@ -113,17 +115,24 @@ export default function Messages() {
   const [selected, setSelected] = useState(initialMessages[0])
   const [modalCompose, setCompose] = useState(false)
 
+  useEffect(() => {
+    let mounted = true
+    list('/messagerie/')
+      .then(messagesApi => {
+        if (!mounted) return
+        const next = messagesApi.map(mapMessage)
+        setMessages(next)
+        setSelected(next[0] || null)
+      })
+      .catch(error => console.error('Chargement messagerie API impossible:', error))
+    return () => { mounted = false }
+  }, [])
+
   const nonLus = messages.filter(m => !m.lu).length
 
-  const handleSend = data => {
-    const n = { 
-      ...data, 
-      id: `msg-${Date.now()}`, 
-      expediteurNom: `${user.prenom} ${user.nom}`, 
-      expediteurRole: user.role, 
-      date: new Date().toISOString().split('T')[0], 
-      lu: true 
-    }
+  const handleSend = async data => {
+    const saved = await create('/messagerie/', { destinataire_type: data.destinataireType, classe: data.classeId ? Number(data.classeId) : null, objet: data.objet, contenu: data.contenu, lu: true })
+    const n = mapMessage(saved)
     setMessages(v => [n, ...v])
     setSelected(n)
     setCompose(false)
@@ -131,7 +140,10 @@ export default function Messages() {
 
   const handleSelect = msg => {
     setSelected(msg)
-    if (!msg.lu) setMessages(v => v.map(m => m.id === msg.id ? { ...m, lu: true } : m))
+    if (!msg.lu) {
+      update(`/messagerie/${msg.apiId || msg.id}/`, { lu: true }).catch(() => {})
+      setMessages(v => v.map(m => m.id === msg.id ? { ...m, lu: true } : m))
+    }
   }
 
   const destLabel = m => m.destinataireType === 'classe' ? 'Classe spécifique' : m.destinataireType === 'equipe' ? 'Équipe pédagogique' : m.destinataireType === 'parents_impayes' ? 'Parents (Impayés)' : 'Tous les parents'
@@ -158,10 +170,12 @@ export default function Messages() {
                   <Avatar prenom={p.prenom} nom={p.nom} size="sm" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <p className={"text-sm truncate " + (!msg.lu ? 'font-bold text-navy' : 'font-semibold text-navy/80')}>{msg.expediteurNom}</p>
-                      {!msg.lu && <span className="w-2 h-2 bg-amber rounded-full flex-shrink-0" />}
+                      <p className={"text-sm truncate " + (!msg.lu ? 'font-bold text-navy' : 'font-semibold text-navy/80')}>
+                        {msg.expediteurNom === (user?.prenom + ' ' + user?.nom) ? `À: ${msg.destinataireNom || 'Tous'}` : msg.expediteurNom}
+                      </p>
+                      {!msg.lu && msg.expediteurNom !== (user?.prenom + ' ' + user?.nom) && <span className="w-2 h-2 bg-amber rounded-full flex-shrink-0" />}
                     </div>
-                    <p className={"text-xs truncate mt-0.5 " + (!msg.lu ? 'text-navy font-medium' : 'text-slate')}>{msg.objet}</p>
+                    <p className={"text-xs truncate mt-0.5 " + (!msg.lu && msg.expediteurNom !== (user?.prenom + ' ' + user?.nom) ? 'text-navy font-medium' : 'text-slate')}>{msg.objet}</p>
                     <div className="flex items-center gap-1.5 mt-1">
                       <Clock size={10} className="text-slate/50" />
                       <span className="text-[10px] text-slate/60">{msg.date}</span>
