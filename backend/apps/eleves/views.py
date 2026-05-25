@@ -20,7 +20,7 @@ class ParentEleveListCreateView(generics.ListCreateAPIView):
         if not ecole:
             return ParentEleve.objects.none()
         
-        qs = ParentEleve.objects.filter(enfants__classe__ecole=ecole).distinct()
+        qs = ParentEleve.objects.filter(ecole=ecole)
         
         if user.role in [Role.ADMIN, Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE]:
             return qs
@@ -48,7 +48,7 @@ class ParentEleveDetailView(generics.RetrieveUpdateDestroyAPIView):
         if not ecole:
             return ParentEleve.objects.none()
             
-        qs = ParentEleve.objects.filter(enfants__classe__ecole=ecole).distinct()
+        qs = ParentEleve.objects.filter(ecole=ecole)
         
         if user.role in [Role.ADMIN, Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE]:
             return qs

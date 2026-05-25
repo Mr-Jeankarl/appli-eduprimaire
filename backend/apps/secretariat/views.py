@@ -47,8 +47,10 @@ def valider_inscription(request, pk):
     Appelé par la comptabilité après réception du paiement.
     Crée automatiquement l'élève et le parent dans la BDD.
     """
+    from apps.ecole.utils import resolve_ecole
+    ecole = resolve_ecole(request)
     try:
-        dossier = DossierInscription.objects.get(pk=pk)
+        dossier = DossierInscription.objects.get(pk=pk, classe_souhaitee__ecole=ecole)
     except DossierInscription.DoesNotExist:
         return Response({'error': 'Dossier introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -60,6 +62,7 @@ def valider_inscription(request, pk):
 
         # 1. Créer le parent
         parent = ParentEleve.objects.create(
+            ecole=dossier.classe_souhaitee.ecole if dossier.classe_souhaitee else None,
             nom=dossier.parent_nom,
             prenom=dossier.parent_prenom,
             telephone=dossier.parent_telephone,
@@ -101,8 +104,10 @@ def valider_inscription(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAdminOrDirecteur])
 def rejeter_inscription(request, pk):
+    from apps.ecole.utils import resolve_ecole
+    ecole = resolve_ecole(request)
     try:
-        dossier = DossierInscription.objects.get(pk=pk)
+        dossier = DossierInscription.objects.get(pk=pk, classe_souhaitee__ecole=ecole)
     except DossierInscription.DoesNotExist:
         return Response({'error': 'Dossier introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 

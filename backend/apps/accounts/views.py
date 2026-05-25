@@ -56,7 +56,6 @@ class ChangePasswordView(generics.GenericAPIView):
 
 
 class UserListCreateView(generics.ListCreateAPIView):
-    queryset = User.objects.all()
     permission_classes = [IsAdminOrDirecteur]
 
     def get_serializer_class(self):
@@ -64,11 +63,31 @@ class UserListCreateView(generics.ListCreateAPIView):
             return UserCreateSerializer
         return UserSerializer
 
+    def get_queryset(self):
+        from apps.ecole.utils import resolve_ecole
+        ecole = resolve_ecole(self.request)
+        if self.request.user.is_superuser or self.request.user.is_staff:
+            if not ecole:
+                return User.objects.all()
+        return User.objects.filter(ecole=ecole)
+
+    def perform_create(self, serializer):
+        from apps.ecole.utils import resolve_ecole
+        ecole = resolve_ecole(self.request)
+        serializer.save(ecole=ecole)
+
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [IsAdminOrDirecteur]
+
+    def get_queryset(self):
+        from apps.ecole.utils import resolve_ecole
+        ecole = resolve_ecole(self.request)
+        if self.request.user.is_superuser or self.request.user.is_staff:
+            if not ecole:
+                return User.objects.all()
+        return User.objects.filter(ecole=ecole)
 
 
 class RegisterView(generics.CreateAPIView):

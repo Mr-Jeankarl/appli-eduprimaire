@@ -100,10 +100,11 @@ for nom, montant, ordre in [('Scolarité T1', 150000, 1), ('Cantine Mensuelle', 
 
 parent, _ = ParentEleve.objects.get_or_create(
     email='parent1@gmail.com',
-    defaults={'nom': 'Diallo', 'prenom': 'Seydou', 'telephone': '+226 76 33 44 55', 'compte_utilisateur': parent_user},
+    defaults={'ecole': ecole, 'nom': 'Diallo', 'prenom': 'Seydou', 'telephone': '+226 76 33 44 55', 'compte_utilisateur': parent_user},
 )
-if parent.compte_utilisateur_id is None:
+if parent.compte_utilisateur_id is None or parent.ecole_id is None:
     parent.compte_utilisateur = parent_user
+    parent.ecole = ecole
     parent.save()
 
 eleves_data = [
@@ -155,7 +156,7 @@ for eleve in eleves[:4]:
         )
 
 for titre, auteur in [('Mathématiques CM2', 'Collectif IPAM'), ('Mon Livre de Français', 'Nathan'), ('Le Petit Prince', 'Antoine de Saint-Exupéry')]:
-    Livre.objects.get_or_create(titre=titre, defaults={'auteur': auteur, 'categorie': 'Manuels', 'stock_total': 10, 'stock_dispo': 8})
+    Livre.objects.get_or_create(ecole=ecole, titre=titre, defaults={'auteur': auteur, 'categorie': 'Manuels', 'stock_total': 10, 'stock_dispo': 8})
 
 if matieres and enseignants:
     CreneauEmploiDuTemps.objects.get_or_create(

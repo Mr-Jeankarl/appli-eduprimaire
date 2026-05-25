@@ -117,9 +117,13 @@ from rest_framework import response
 from .utils import generer_pdf_bulletin
 
 class BulletinPDFView(generics.GenericAPIView):
-    # queryset is resolved per-request via get_object
-    queryset = Bulletin.objects.select_related('eleve', 'valide_par')
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        from apps.ecole.utils import resolve_ecole
+        ecole = resolve_ecole(self.request)
+        return Bulletin.objects.select_related('eleve', 'valide_par').filter(eleve__classe__ecole=ecole)
 
     def get(self, request, pk, *args, **kwargs):
         bulletin = self.get_object()

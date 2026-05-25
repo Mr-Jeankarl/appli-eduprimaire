@@ -2,6 +2,10 @@ from django.db import models
 
 
 class Livre(models.Model):
+    ecole = models.ForeignKey(
+        'ecole.Ecole', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='livres'
+    )
     titre = models.CharField(max_length=200)
     auteur = models.CharField(max_length=150, blank=True)
     isbn = models.CharField(max_length=40, blank=True)

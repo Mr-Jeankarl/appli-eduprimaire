@@ -12,8 +12,12 @@ class LivreListCreateView(generics.ListCreateAPIView):
     search_fields = ['titre', 'auteur', 'isbn', 'editeur']
 
     def get_queryset(self):
-        # `Livre` is currently global; if later per-ecole, filter here by ecole
-        return Livre.objects.all()
+        ecole = resolve_ecole(self.request)
+        return Livre.objects.filter(ecole=ecole)
+
+    def perform_create(self, serializer):
+        ecole = resolve_ecole(self.request)
+        serializer.save(ecole=ecole)
 
 
 class LivreDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -21,7 +25,8 @@ class LivreDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Livre.objects.all()
+        ecole = resolve_ecole(self.request)
+        return Livre.objects.filter(ecole=ecole)
 
 
 class EmpruntListCreateView(generics.ListCreateAPIView):

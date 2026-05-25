@@ -16,6 +16,10 @@ class Sexe(models.TextChoices):
 
 class ParentEleve(models.Model):
     """Parent ou tuteur d'un élève. Créé automatiquement lors de l'inscription."""
+    ecole = models.ForeignKey(
+        'ecole.Ecole', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='parents'
+    )
     nom = models.CharField(max_length=100)
     prenom = models.CharField(max_length=100)
     telephone = models.CharField(max_length=20)
