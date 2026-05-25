@@ -138,15 +138,41 @@ class SetupSchoolView(generics.GenericAPIView):
             if not nom:
                 return Response({'error': "Le nom de l'école est obligatoire."}, status=status.HTTP_400_BAD_REQUEST)
             adresse = request.data.get('adresse', '')
-            telephone = request.data.get('telephone', '')
-            email = request.data.get('email', '')
+            telephones = request.data.get('telephones', [])
+            emails = request.data.get('emails', [])
+            description = request.data.get('description', '')
+            classes_selectionnees = request.data.get('classes', []) # ex: ['CP1', 'CP2', 'CE1']
             
-            ecole = Ecole.objects.create(nom=nom, adresse=adresse, telephone=telephone, email=email)
+            # Prendre le premier téléphone et email pour les champs plats historiques
+            tel_plat = telephones[0] if telephones else ''
+            email_plat = emails[0] if emails else ''
+
+            ecole = Ecole.objects.create(
+                nom=nom, 
+                adresse=adresse, 
+                telephone=tel_plat, 
+                email=email_plat,
+                telephones=telephones,
+                emails=emails,
+                description=description
+            )
+            
+            # Créer automatiquement les classes sélectionnées
+            from apps.ecole.models import Classe
+            for niveau in classes_selectionnees:
+                # Créer une classe avec le niveau et nom par défaut (ex: CP1)
+                Classe.objects.get_or_create(
+                    ecole=ecole,
+                    niveau=niveau,
+                    nom=niveau,
+                    annee_scolaire=ecole.annee_scolaire
+                )
+
             user.ecole = ecole
             from .models import Role
-            user.role = Role.DIRECTEUR
+            user.role = Role.ADMIN  # On donne le rôle ADMIN lors de la création d'école
             user.save()
-            return Response({'message': 'École créée et associée avec succès.', 'user': UserSerializer(user).data}, status=status.HTTP_200_OK)
+            return Response({'message': 'École créée et configurée avec succès.', 'user': UserSerializer(user).data}, status=status.HTTP_200_OK)
             
         elif action == 'join':
             code = request.data.get('code')

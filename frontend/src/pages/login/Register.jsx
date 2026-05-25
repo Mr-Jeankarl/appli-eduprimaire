@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import { Mail, User, Lock, ArrowLeft } from 'lucide-react'
 import { create } from '../../services/api'
 import { ecole } from '../../data/mockData'
+import { LogoMark } from '../../components/ui'
 
 export default function Register() {
   const [form, setForm] = useState({ email: '', prenom: '', nom: '', password: '' })
@@ -37,9 +38,7 @@ export default function Register() {
     <div className="min-h-screen bg-beige flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-body">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-amber flex items-center justify-center font-display font-bold text-navy text-2xl shadow-lg">
-            {ecole.logoInitiales}
-          </div>
+          <LogoMark src={ecole.logoUrl} initials={ecole.logoInitiales} size="xl" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-display font-extrabold text-navy">
           Créer un compte

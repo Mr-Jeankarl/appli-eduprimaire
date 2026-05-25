@@ -1,38 +1,22 @@
 import { useState, useMemo } from 'react'
 import { classes as mockClasses, eleves } from '../../data/mockData'
+import { ImageUploader } from '../../components/ui'
 
 const INIT = { nom: '', prenom: '', dateNaissance: '', sexe: 'M', classeId: '', matricule: '', statut: 'INSCRIT', parentNom: '', parentTel: '', parentEmail: '', parent2Nom: '', parent2Tel: '', parent2Email: '' }
 
 export default function EleveForm({ onSubmit, onCancel, initial = {}, classesOptions = mockClasses }) {
-  // Génération automatique du matricule
-  const autoMatricule = useMemo(() => {
-    const year = new Date().getFullYear()
-    const count = eleves.length + 1
-    return `#${year}-${String(count).padStart(3, '0')}`
-  }, [])
-
-  const [form, setForm] = useState({ ...INIT, matricule: autoMatricule, ...initial })
+  const [form, setForm] = useState({ ...INIT, ...initial })
   const set = k => e => setForm(v => ({ ...v, [k]: e.target.value }))
 
   return (
     <form onSubmit={e => { e.preventDefault(); onSubmit(form) }} className="space-y-5">
       <div>
         <p className="text-xs font-bold text-slate uppercase tracking-wider mb-3">Informations élève</p>
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-20 h-20 bg-beige border border-beige-dark rounded-xl flex items-center justify-center overflow-hidden">
-            {form.photo ? (
-              <img src={typeof form.photo === 'string' ? form.photo : URL.createObjectURL(form.photo)} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-2xl">👤</span>
-            )}
-          </div>
-          <div>
-            <label className="btn-ghost text-xs py-1.5 cursor-pointer">
-              {form.photo ? 'Changer la photo' : 'Ajouter une photo'}
-              <input type="file" className="hidden" accept="image/*" onChange={e => setForm(v => ({ ...v, photo: e.target.files[0] }))} />
-            </label>
-            <p className="text-[10px] text-slate/60 mt-1">Format JPG, PNG. Max 2Mo.</p>
-          </div>
+        <div className="mb-4">
+          <ImageUploader 
+            value={form.photo} 
+            onChange={file => setForm(v => ({ ...v, photo: file }))} 
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -63,8 +47,8 @@ export default function EleveForm({ onSubmit, onCancel, initial = {}, classesOpt
           </div>
           <div>
             <label className="text-xs font-semibold text-slate">Matricule</label>
-            <input className="input-base mt-1 bg-beige/50" readOnly value={form.matricule} placeholder="Auto-généré" />
-            <p className="text-[10px] text-slate/60 mt-0.5">Généré automatiquement</p>
+            <input className="input-base mt-1 bg-beige/50 font-mono text-navy font-bold" readOnly value={form.id ? form.matricule : "AUTO-GÉNÉRÉ"} placeholder="Auto-généré" />
+            <p className="text-[10px] text-slate/60 mt-0.5">Format: EDU{"{école}"}{"{séquence}"}</p>
           </div>
         </div>
       </div>

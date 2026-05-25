@@ -62,6 +62,12 @@ export async function apiRequest(path, options = {}) {
   if (token) {
     headers.set('Authorization', `Bearer ${token}`)
   }
+
+  // Injecter X-School-Id si présent dans localStorage (pour l'impersonation par le superadmin)
+  const impersonateSchoolId = localStorage.getItem('eduprimaire_impersonate_school_id')
+  if (impersonateSchoolId) {
+    headers.set('X-School-Id', impersonateSchoolId)
+  }
   
   if (options.body && !(options.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')

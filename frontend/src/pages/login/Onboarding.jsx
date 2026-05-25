@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { apiRequest } from '../../services/api'
+import { ecole } from '../../data/mockData'
+import { LogoMark } from '../../components/ui'
+import Modal from '../../components/ui/Modal'
 import { School, UserPlus, ArrowLeft, Loader2, LogOut, CheckCircle, HelpCircle } from 'lucide-react'
 
 export default function Onboarding() {
@@ -14,8 +17,31 @@ export default function Onboarding() {
   const [successMsg, setSuccessMsg] = useState('')
 
   // Form states
-  const [schoolForm, setSchoolForm] = useState({ nom: '', adresse: '', telephone: '', email: '' })
+  const [schoolForm, setSchoolForm] = useState({ nom: '', adresse: '', description: '' })
+  const [telephones, setTelephones] = useState([''])
+  const [emails, setEmails] = useState([''])
+  const [selectedClasses, setSelectedClasses] = useState([])
   const [inviteCode, setInviteCode] = useState('')
+
+  const classesOptions = [
+    { value: 'CP1', label: 'CP1' },
+    { value: 'CP2', label: 'CP2' },
+    { value: 'CP', label: 'CP (Combiné)' },
+    { value: 'CE1', label: 'CE1' },
+    { value: 'CE2', label: 'CE2' },
+    { value: 'CE', label: 'CE (Combiné)' },
+    { value: 'CM1', label: 'CM1' },
+    { value: 'CM2', label: 'CM2' },
+    { value: 'CM', label: 'CM (Combiné)' },
+  ]
+
+  const handleClassToggle = (val) => {
+    if (selectedClasses.includes(val)) {
+      setSelectedClasses(selectedClasses.filter(c => c !== val))
+    } else {
+      setSelectedClasses([...selectedClasses, val])
+    }
+  }
 
   // Redirect if they already have a school
   if (user && user.ecoleId) {
@@ -37,8 +63,10 @@ export default function Onboarding() {
           action: 'create',
           nom: schoolForm.nom,
           adresse: schoolForm.adresse,
-          telephone: schoolForm.telephone,
-          email: schoolForm.email,
+          description: schoolForm.description,
+          telephones: telephones.filter(t => t.trim() !== ''),
+          emails: emails.filter(m => m.trim() !== ''),
+          classes: selectedClasses,
         }
       })
       setSuccessMsg("Votre école a été créée avec succès ! Préparation de votre tableau de bord...")
@@ -89,9 +117,7 @@ export default function Onboarding() {
       {/* Header bar */}
       <div className="w-full max-w-5xl mx-auto flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <span className="w-10 h-10 rounded-xl bg-navy text-white flex items-center justify-center font-display font-extrabold shadow-md">
-            EP
-          </span>
+          <LogoMark src={ecole.logoUrl} initials={ecole.logoInitiales} size="md" />
           <span className="font-display font-extrabold text-navy text-lg tracking-wide hidden sm:inline">
             EduPrimaire
           </span>
@@ -109,7 +135,7 @@ export default function Onboarding() {
       {/* Main Content */}
       <div className="w-full max-w-4xl mx-auto my-auto py-8">
         
-        {step === 'choice' && (
+        {step !== 'success' && (
           <div className="text-center space-y-8 animate-fade-in">
             <div className="space-y-3">
               <h1 className="text-4xl font-display font-extrabold text-navy sm:text-5xl">
@@ -172,156 +198,242 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Step: Create Form */}
-        {step === 'create' && (
-          <div className="max-w-xl mx-auto bg-white rounded-2xl border border-beige-dark/60 shadow-xl overflow-hidden p-6 sm:p-10 animate-slide-up">
-            <button
-              onClick={() => setStep('choice')}
-              className="flex items-center gap-2 text-slate hover:text-navy transition-colors mb-6 text-sm font-semibold"
-            >
-              <ArrowLeft size={16} />
-              <span>Retour</span>
-            </button>
+        {/* Modal: Create School */}
+        <Modal
+          open={step === 'create'}
+          onClose={() => { setStep('choice'); setError(''); }}
+          title="Créer votre établissement"
+          size="lg"
+        >
+          <div className="space-y-1 mb-6">
+            <p className="text-slate text-sm">Définissez les paramètres de base et la configuration de votre nouvelle école.</p>
+          </div>
 
-            <div className="space-y-1 mb-8">
-              <h2 className="text-3xl font-display font-bold text-navy">Créer votre établissement</h2>
-              <p className="text-slate text-sm">Définissez les paramètres de base de votre nouvelle école.</p>
+          <form onSubmit={handleCreateSchool} className="space-y-5 max-h-[70vh] overflow-y-auto pr-2">
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-navy mb-1">Nom de l'école *</label>
+              <input
+                required
+                type="text"
+                placeholder="ex: École Primaire Les Étoiles"
+                value={schoolForm.nom}
+                onChange={(e) => setSchoolForm({ ...schoolForm, nom: e.target.value })}
+                className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
+              />
             </div>
 
-            <form onSubmit={handleCreateSchool} className="space-y-5">
-              {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
-                  {error}
-                </div>
-              )}
+            <div>
+              <label className="block text-sm font-bold text-navy mb-1">Description / Slogan</label>
+              <textarea
+                placeholder="Décrivez votre école ou renseignez votre slogan..."
+                value={schoolForm.description}
+                onChange={(e) => setSchoolForm({ ...schoolForm, description: e.target.value })}
+                className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none h-20"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-bold text-navy mb-1">Nom de l'école *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="ex: École Primaire Les Étoiles"
-                  value={schoolForm.nom}
-                  onChange={(e) => setSchoolForm({ ...schoolForm, nom: e.target.value })}
-                  className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-bold text-navy mb-1">Adresse physique</label>
+              <input
+                type="text"
+                placeholder="ex: Avenue de la Liberté, Ouagadougou"
+                value={schoolForm.adresse}
+                onChange={(e) => setSchoolForm({ ...schoolForm, adresse: e.target.value })}
+                className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
+              />
+            </div>
 
-              <div>
-                <label className="block text-sm font-bold text-navy mb-1">Adresse physique</label>
-                <input
-                  type="text"
-                  placeholder="ex: Avenue de la Liberté, Ouagadougou"
-                  value={schoolForm.adresse}
-                  onChange={(e) => setSchoolForm({ ...schoolForm, adresse: e.target.value })}
-                  className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-navy mb-1">Téléphone</label>
+            {/* Téléphones multiples (jusqu'à 5) */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-navy">Numéros de téléphone (max. 5)</label>
+              {telephones.map((tel, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
                   <input
                     type="text"
-                    placeholder="ex: +226 25 30 00 00"
-                    value={schoolForm.telephone}
-                    onChange={(e) => setSchoolForm({ ...schoolForm, telephone: e.target.value })}
-                    className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
+                    placeholder={`Téléphone ${idx + 1}`}
+                    value={tel}
+                    onChange={(e) => {
+                      const newTels = [...telephones]
+                      newTels[idx] = e.target.value
+                      setTelephones(newTels)
+                    }}
+                    className="flex-1 focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-navy mb-1">Email de contact</label>
-                  <input
-                    type="email"
-                    placeholder="ex: contact@ecole.com"
-                    value={schoolForm.email}
-                    onChange={(e) => setSchoolForm({ ...schoolForm, email: e.target.value })}
-                    className="w-full focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-amber hover:bg-amber-dark transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      <span>Création de l'école...</span>
-                    </>
-                  ) : (
-                    <span>Valider et créer</span>
+                  {telephones.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setTelephones(telephones.filter((_, i) => i !== idx))}
+                      className="p-3 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                    >
+                      Supprimer
+                    </button>
                   )}
+                </div>
+              ))}
+              {telephones.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setTelephones([...telephones, ''])}
+                  className="text-sm font-bold text-amber hover:text-amber-dark flex items-center gap-1"
+                >
+                  + Ajouter un numéro de téléphone
                 </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-        {/* Step: Join Form */}
-        {step === 'join' && (
-          <div className="max-w-xl mx-auto bg-white rounded-2xl border border-beige-dark/60 shadow-xl overflow-hidden p-6 sm:p-10 animate-slide-up">
-            <button
-              onClick={() => setStep('choice')}
-              className="flex items-center gap-2 text-slate hover:text-navy transition-colors mb-6 text-sm font-semibold"
-            >
-              <ArrowLeft size={16} />
-              <span>Retour</span>
-            </button>
-
-            <div className="space-y-1 mb-8">
-              <h2 className="text-3xl font-display font-bold text-navy">Rejoindre une école</h2>
-              <p className="text-slate text-sm">Entrez le code d'invitation secret fourni par votre école.</p>
+              )}
             </div>
 
-            <form onSubmit={handleJoinSchool} className="space-y-5">
-              {error && (
-                <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-bold text-navy mb-1">Code d'invitation *</label>
-                <input
-                  required
-                  type="text"
-                  placeholder="ex: INVITE-XXXXXX"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  className="w-full focus:ring-navy focus:border-navy sm:text-sm border-gray-300 rounded-lg p-4 border bg-beige-light/50 focus:bg-white font-mono text-center text-lg tracking-widest outline-none uppercase transition-all"
-                />
-              </div>
-
-              <div className="bg-beige-light/40 border border-beige-dark/30 rounded-xl p-4 flex gap-3 text-slate text-sm">
-                <HelpCircle className="text-slate shrink-0" size={18} />
-                <p className="leading-relaxed">
-                  Chaque code d'invitation est unique, confidentiel et à usage unique. Il associera votre compte au rôle prédéfini par l'administrateur.
-                </p>
-              </div>
-
-              <div className="pt-4">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-navy hover:bg-navy-light transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="animate-spin" size={18} />
-                      <span>Validation du code...</span>
-                    </>
-                  ) : (
-                    <span>Valider et rejoindre</span>
+            {/* Emails multiples (jusqu'à 5) */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-navy">Adresses email de contact (max. 5)</label>
+              {emails.map((mail, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <input
+                    type="email"
+                    placeholder={`Email ${idx + 1}`}
+                    value={mail}
+                    onChange={(e) => {
+                      const newEmails = [...emails]
+                      newEmails[idx] = e.target.value
+                      setEmails(newEmails)
+                    }}
+                    className="flex-1 focus:ring-amber focus:border-amber sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light/50 focus:bg-white transition-all outline-none"
+                  />
+                  {emails.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setEmails(emails.filter((_, i) => i !== idx))}
+                      className="p-3 text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                    >
+                      Supprimer
+                    </button>
                   )}
+                </div>
+              ))}
+              {emails.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => setEmails([...emails, ''])}
+                  className="text-sm font-bold text-amber hover:text-amber-dark flex items-center gap-1"
+                >
+                  + Ajouter un email
                 </button>
+              )}
+            </div>
+
+            {/* Choix des Niveaux de classe */}
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-navy">Niveaux de classes présents dans votre école</label>
+              <div className="grid grid-cols-3 gap-3">
+                {classesOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => handleClassToggle(opt.value)}
+                    className={`p-3 border rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                      selectedClasses.includes(opt.value)
+                        ? 'border-amber bg-amber/10 text-navy'
+                        : 'border-beige-dark/50 hover:bg-beige-light/30 text-slate'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
-            </form>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setStep('choice'); setError(''); }}
+                className="w-1/3 py-3 px-4 border border-beige-dark rounded-lg text-sm font-bold text-slate hover:bg-beige-light hover:text-navy transition-all flex items-center justify-center cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-amber hover:bg-amber-dark transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Création de l'école...</span>
+                  </>
+                ) : (
+                  <span>Valider et créer</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Modal: Join School */}
+        <Modal
+          open={step === 'join'}
+          onClose={() => { setStep('choice'); setError(''); }}
+          title="Rejoindre une école"
+          size="md"
+        >
+          <div className="space-y-1 mb-6">
+            <p className="text-slate text-sm">Entrez le code d'invitation secret fourni par votre école.</p>
           </div>
-        )}
+
+          <form onSubmit={handleJoinSchool} className="space-y-5">
+            {error && (
+              <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
+                {error}
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-bold text-navy mb-1">Code d'invitation *</label>
+              <input
+                required
+                type="text"
+                placeholder="ex: INVITE-XXXXXX"
+                value={inviteCode}
+                onChange={(e) => setInviteCode(e.target.value)}
+                className="w-full focus:ring-navy focus:border-navy sm:text-sm border-gray-300 rounded-lg p-4 border bg-beige-light/50 focus:bg-white font-mono text-center text-lg tracking-widest outline-none uppercase transition-all"
+              />
+            </div>
+
+            <div className="bg-beige-light/40 border border-beige-dark/30 rounded-xl p-4 flex gap-3 text-slate text-sm">
+              <HelpCircle className="text-slate shrink-0" size={18} />
+              <p className="leading-relaxed">
+                Chaque code d'invitation est unique, confidentiel et à usage unique. Il associera votre compte au rôle prédéfini par l'administrateur.
+              </p>
+            </div>
+
+            <div className="pt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setStep('choice'); setError(''); }}
+                className="w-1/3 py-3 px-4 border border-beige-dark rounded-lg text-sm font-bold text-slate hover:bg-beige-light hover:text-navy transition-all flex items-center justify-center cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="flex-1 py-3 px-4 border border-transparent rounded-lg shadow-md text-sm font-bold text-white bg-navy hover:bg-navy-light transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    <span>Validation du code...</span>
+                  </>
+                ) : (
+                  <span>Valider et rejoindre</span>
+                )}
+              </button>
+            </div>
+          </form>
+        </Modal>
 
         {/* Step: Success */}
         {step === 'success' && (

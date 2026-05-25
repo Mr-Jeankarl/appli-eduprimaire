@@ -1,13 +1,19 @@
 from django.db import models
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+import random, string
 
 
 class NiveauClasse(models.TextChoices):
     CP1 = 'CP1', 'CP1'
     CP2 = 'CP2', 'CP2'
+    CP = 'CP', 'CP'
     CE1 = 'CE1', 'CE1'
     CE2 = 'CE2', 'CE2'
+    CE = 'CE', 'CE'
     CM1 = 'CM1', 'CM1'
     CM2 = 'CM2', 'CM2'
+    CM = 'CM', 'CM'
 
 
 class Module(models.TextChoices):
@@ -44,11 +50,16 @@ class Ecole(models.Model):
     adresse = models.TextField(blank=True)
     telephone = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
+    telephones = models.JSONField(default=list, blank=True) # Liste de 5 téléphones max
+    emails = models.JSONField(default=list, blank=True) # Liste de 5 emails max
+    description = models.TextField(blank=True)
     logo = models.ImageField(upload_to='logos/', blank=True, null=True)
+    image = models.ImageField(upload_to='ecoles/images/', blank=True, null=True)
     directeur_nom = models.CharField(max_length=200, blank=True)
     devise = models.CharField(max_length=10, default='FCFA')
     annee_scolaire = models.CharField(max_length=9, default='2024-2025')
     date_creation = models.DateTimeField(auto_now_add=True)
+    is_demo = models.BooleanField(default=False, verbose_name='École de démonstration')
 
     class Meta:
         verbose_name = 'École'
@@ -63,8 +74,27 @@ class Ecole(models.Model):
             year = datetime.date.today().year
             suffix = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
             self.code = f"EDU-{year}-{suffix}"
-            # En cas de collision, laisse la DB lever l'erreur (peu probable)
         super().save(*args, **kwargs)
+
+# Signal to créer les invitations par défaut pour chaque nouvelle école
+from utils.id_generator import generate_invite_code
+
+@receiver(post_save, sender=Ecole)
+def creer_invitations_par_defaut(sender, instance, created, **kwargs):
+    if created:
+        # Crée les invitations pour les rôles standard
+        roles = ['ADMIN', 'TEACHER', 'ACCOUNTANT', 'STUDENT']
+        for role in roles:
+            Invitation.objects.create(
+                ecole=instance,
+                code=generate_invite_code(8),
+                role=role,
+                expire_le=None,
+                utilise=False,
+            )
+
+
+
 
 
 class ConfigModule(models.Model):
@@ -136,7 +166,10 @@ class Matiere(models.Model):
     nom = models.CharField(max_length=100)
     code = models.CharField(max_length=10)
     coefficient = models.PositiveIntegerField(default=1)
+    note_sur = models.PositiveIntegerField(default=20) # ex: noté sur 10 ou 20
     niveaux = models.JSONField(default=list)  # Liste des niveaux concernés
+    categorie = models.CharField(max_length=50, blank=True, null=True)
+    description = models.TextField(blank=True, null=True)
 
     class Meta:
         unique_together = ['ecole', 'code']
@@ -151,6 +184,12 @@ class Invitation(models.Model):
     """Code d'invitation pour rejoindre une école."""
     ecole = models.ForeignKey(Ecole, on_delete=models.CASCADE, related_name='invitations')
     code = models.CharField(max_length=50, unique=True)
+    role = models.CharField(max_length=20, default='STUDENT', choices=[
+        ('ADMIN', 'Administrateur'),
+        ('TEACHER', 'Enseignant'),
+        ('ACCOUNTANT', 'Comptable'),
+        ('STUDENT', 'Élève'),
+    ])
     cible_email = models.EmailField(blank=True, null=True)
     cree_le = models.DateTimeField(auto_now_add=True)
     expire_le = models.DateTimeField(null=True, blank=True)
@@ -160,4 +199,4 @@ class Invitation(models.Model):
         verbose_name = 'Invitation'
 
     def __str__(self):
-        return f"{self.code} → {self.ecole.nom} ({'utilisé' if self.utilise else 'actif'})"
+        return f"{self.code} ({self.get_role_display()}) → {self.ecole.nom} ({'utilisé' if self.utilise else 'actif'})"

@@ -65,6 +65,15 @@ class Eleve(models.Model):
     def nom_complet(self):
         return f"{self.prenom} {self.nom}"
 
+    def save(self, *args, **kwargs):
+        if not self.matricule:
+            from utils.id_generator import generate_matricule
+            school_id = 1
+            if self.classe and self.classe.ecole:
+                school_id = self.classe.ecole.id
+            self.matricule = generate_matricule(school_id)
+        super().save(*args, **kwargs)
+
     @classmethod
     def generer_matricule(cls, annee_scolaire):
         annee = annee_scolaire.replace('-', '')[:6]

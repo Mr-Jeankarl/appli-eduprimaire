@@ -6,6 +6,9 @@ from apps.accounts.permissions import IsStaffUser, IsAdmin, IsDirecteur, IsParen
 from apps.accounts.models import Role
 
 
+from apps.ecole.utils import resolve_ecole
+
+
 class ParentEleveListCreateView(generics.ListCreateAPIView):
     serializer_class = ParentEleveSerializer
     permission_classes = [IsAuthenticated]
@@ -13,16 +16,26 @@ class ParentEleveListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        ecole = resolve_ecole(self.request)
+        if not ecole:
+            return ParentEleve.objects.none()
+        
+        qs = ParentEleve.objects.filter(enfants__classe__ecole=ecole).distinct()
+        
         if user.role in [Role.ADMIN, Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE]:
-            return ParentEleve.objects.all()
+            return qs
         if user.role == Role.PARENT:
-            return ParentEleve.objects.filter(compte_utilisateur=user)
+            return qs.filter(compte_utilisateur=user)
         return ParentEleve.objects.none()
 
     def get_permissions(self):
         if self.request.method == 'POST':
             return [IsStaffUser()]
         return [IsAuthenticated()]
+
+    def perform_create(self, serializer):
+        ecole = resolve_ecole(self.request)
+        serializer.save(ecole=ecole)
 
 
 class ParentEleveDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -31,10 +44,16 @@ class ParentEleveDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        ecole = resolve_ecole(self.request)
+        if not ecole:
+            return ParentEleve.objects.none()
+            
+        qs = ParentEleve.objects.filter(enfants__classe__ecole=ecole).distinct()
+        
         if user.role in [Role.ADMIN, Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE]:
-            return ParentEleve.objects.all()
+            return qs
         if user.role == Role.PARENT:
-            return ParentEleve.objects.filter(compte_utilisateur=user)
+            return qs.filter(compte_utilisateur=user)
         return ParentEleve.objects.none()
 
     def get_permissions(self):
@@ -51,7 +70,11 @@ class EleveListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Eleve.objects.select_related('classe', 'parent').all()
+        ecole = resolve_ecole(self.request)
+        if not ecole:
+            return Eleve.objects.none()
+            
+        qs = Eleve.objects.select_related('classe', 'parent').filter(classe__ecole=ecole)
         
         if user.role in [Role.ADMIN, Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE]:
             return qs
@@ -66,6 +89,10 @@ class EleveListCreateView(generics.ListCreateAPIView):
             return [IsStaffUser()]
         return [IsAuthenticated()]
 
+    def perform_create(self, serializer):
+        ecole = resolve_ecole(self.request)
+        serializer.save(ecole=ecole)
+
 
 class EleveDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EleveSerializer
@@ -73,7 +100,11 @@ class EleveDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Eleve.objects.select_related('classe', 'parent').all()
+        ecole = resolve_ecole(self.request)
+        if not ecole:
+            return Eleve.objects.none()
+            
+        qs = Eleve.objects.select_related('classe', 'parent').filter(classe__ecole=ecole)
         
         if user.role in [Role.ADMIN, Role.DIRECTEUR, Role.SECRETAIRE, Role.COMPTABLE]:
             return qs

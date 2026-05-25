@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Save, Plus, Edit2, Trash2, Eye, EyeOff, Shield, School, Users, ToggleLeft, ToggleRight, Moon, Sun, Palette, Building2, Copy, RefreshCw, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { Save, Plus, Edit2, Trash2, Eye, EyeOff, Shield, School, Users, ToggleLeft, ToggleRight, Moon, Sun, Palette, Building2, Copy, RefreshCw, CheckCircle2, Clock, XCircle, BookOpen } from 'lucide-react'
 import { ecole as initEcole, utilisateurs as initUsers } from '../../data/mockData'
+import { LogoMark, InvitationPanel } from '../../components/ui'
 import { Avatar } from '../../components/ui/index'
 import Modal from '../../components/ui/Modal'
 import { useAuth } from '../../context/AuthContext'
@@ -24,8 +25,10 @@ const PERMS = {
 
 const TABS = [
   { id: 'ecole', label: 'École', icon: School },
+  { id: 'matieres', label: 'Matières', icon: BookOpen },
   { id: 'modules', label: 'Modules', icon: ToggleRight },
   { id: 'users', label: 'Utilisateurs', icon: Users },
+  { id: 'invitations', label: 'Invitations', icon: Copy },
   { id: 'roles', label: 'Rôles et Droits', icon: Shield },
   { id: 'apparence', label: 'Apparence', icon: Palette },
   { id: 'saas', label: 'Multi-Écoles', icon: Building2, adminOnly: true },
@@ -46,6 +49,197 @@ const ecolesReseau = [
   { id: 's-3', nom: 'Groupe Scolaire Lumière', ville: 'Abidjan',       pays: 'CI', code: 'EDU-CI-2024-003', statut: 'EN_ESSAI', eleves: 94,  plan: 'Trial' },
   { id: 's-4', nom: 'Académie du Savoir',      ville: 'Dakar',         pays: 'SN', code: 'EDU-SN-2024-004', statut: 'SUSPENDU', eleves: 0,   plan: 'Starter' },
 ]
+
+function MatieresPanel() {
+  const [matieres, setMatieres] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState(null)
+  const [form, setForm] = useState({ nom: '', code: '', coefficient: 1, note_sur: 20 })
+
+  useEffect(() => {
+    fetchMatieres()
+  }, [])
+
+  const fetchMatieres = async () => {
+    setLoading(true)
+    try {
+      const data = await list('/ecole/matieres/')
+      setMatieres(data)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    try {
+      const payload = {
+        nom: form.nom,
+        code: form.code,
+        coefficient: Number(form.coefficient),
+        note_sur: Number(form.note_sur)
+      }
+      if (editing) {
+        await update(`/ecole/matieres/${editing.id}/`, payload)
+      } else {
+        await create('/ecole/matieres/', payload)
+      }
+      setModalOpen(false)
+      setEditing(null)
+      setForm({ nom: '', code: '', coefficient: 1, note_sur: 20 })
+      fetchMatieres()
+    } catch (err) {
+      alert(err.message || "Une erreur est survenue.")
+    }
+  }
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Voulez-vous vraiment supprimer cette matière ?")) return
+    try {
+      await remove(`/ecole/matieres/${id}/`)
+      fetchMatieres()
+    } catch (err) {
+      alert(err.message || "Erreur de suppression.")
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h2 className="font-display font-bold text-navy text-lg">Matières de l'école</h2>
+        <button
+          onClick={() => {
+            setEditing(null)
+            setForm({ nom: '', code: '', coefficient: 1, note_sur: 20 })
+            setModalOpen(true)
+          }}
+          className="btn-primary flex items-center gap-2"
+        >
+          <Plus size={16} /> Nouvelle matière
+        </button>
+      </div>
+
+      <div className="card overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber" />
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-beige border-b border-beige-dark">
+                <th className="text-left px-4 py-3 text-xs font-bold text-slate uppercase tracking-wider">Matière</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-slate uppercase tracking-wider">Code</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-slate uppercase tracking-wider">Coefficient</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-slate uppercase tracking-wider">Notation</th>
+                <th className="text-left px-4 py-3 text-xs font-bold text-slate uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {matieres.map((m) => (
+                <tr key={m.id} className="border-b border-beige-dark/60 hover:bg-beige/40 transition">
+                  <td className="px-4 py-3 font-semibold text-navy">{m.nom}</td>
+                  <td className="px-4 py-3 text-slate font-mono text-xs">{m.code}</td>
+                  <td className="px-4 py-3 text-navy font-semibold">{m.coefficient}</td>
+                  <td className="px-4 py-3 text-slate">Sur {m.note_sur || 20}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setEditing(m)
+                          setForm({ nom: m.nom, code: m.code, coefficient: m.coefficient, note_sur: m.note_sur || 20 })
+                          setModalOpen(true)
+                        }}
+                        className="text-slate hover:text-navy p-1 transition"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(m.id)}
+                        className="text-slate hover:text-coral p-1 transition"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editing ? "Modifier la matière" : "Nouvelle matière"}
+        size="md"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-slate block mb-1">Nom de la matière *</label>
+            <input
+              required
+              type="text"
+              value={form.nom}
+              onChange={(e) => setForm({ ...form, nom: e.target.value })}
+              className="input-base"
+              placeholder="ex: Mathématiques"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate block mb-1">Code *</label>
+            <input
+              required
+              type="text"
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+              className="input-base"
+              placeholder="ex: MATH"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-semibold text-slate block mb-1">Coefficient *</label>
+              <input
+                required
+                type="number"
+                min={1}
+                value={form.coefficient}
+                onChange={(e) => setForm({ ...form, coefficient: Number(e.target.value) })}
+                className="input-base"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate block mb-1">Noté sur *</label>
+              <select
+                value={form.note_sur}
+                onChange={(e) => setForm({ ...form, note_sur: Number(e.target.value) })}
+                className="input-base"
+              >
+                <option value={20}>Sur 20</option>
+                <option value={10}>Sur 10</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setModalOpen(false)} className="btn-ghost">
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary">
+              Enregistrer
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  )
+}
+
 
 function UserForm({ initial = {}, onSubmit, onCancel }) {
   const [form, setForm] = useState({ nom: '', prenom: '', email: '', telephone: '', role: 'ENSEIGNANT', motDePasse: '', ...initial })
@@ -219,7 +413,7 @@ export default function Parametres() {
   // Tabs accessibles au directeur
   const isAdmin = user?.role === 'ADMIN'
   const visibleTabs = isDirecteur
-    ? TABS.filter(t => ['ecole', 'modules', 'roles', 'apparence'].includes(t.id))
+    ? TABS.filter(t => ['ecole', 'matieres', 'modules', 'invitations', 'roles', 'apparence'].includes(t.id))
     : isAdmin ? TABS : TABS.filter(t => !t.adminOnly)
 
   return (
@@ -250,7 +444,7 @@ export default function Parametres() {
             <div><label className="text-xs font-semibold text-slate">Initiales logo (2-3 lettres)</label><input className="input-base mt-1" maxLength={3} value={ecole.logoInitiales} onChange={setE('logoInitiales')} /></div>
           </div>
           <div className="bg-beige border border-beige-dark rounded-xl p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber flex items-center justify-center font-display font-bold text-navy text-sm flex-shrink-0">{ecole.logoInitiales}</div>
+            <LogoMark src={ecole.logoUrl || initEcole.logoUrl} initials={ecole.logoInitiales} size="md" />
             <div><p className="font-display font-bold text-navy">{ecole.nom}</p><p className="text-xs text-slate">{ecole.ville}, {ecole.pays} · {ecole.anneeScolaire}</p></div>
           </div>
           <div className="flex justify-end">
@@ -258,6 +452,8 @@ export default function Parametres() {
           </div>
         </div>
       )}
+
+      {tab === 'matieres' && <MatieresPanel />}
 
       {tab === 'users' && (
         <div className="space-y-4">
@@ -385,6 +581,10 @@ export default function Parametres() {
             <p className="text-xs text-slate">Le thème sombre est désormais actif sur toute l'interface. Votre préférence est sauvegardée dans ce navigateur.</p>
           </div>
         </div>
+      )}
+
+      {tab === 'invitations' && (
+        <InvitationPanel />
       )}
 
       {tab === 'saas' && isAdmin && (

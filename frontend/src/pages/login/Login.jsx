@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { ecole } from '../../data/mockData'
 import { useAuth } from '../../context/AuthContext'
+import { LogoMark } from '../../components/ui'
 import { Lock, Mail } from 'lucide-react'
 
 export default function Login() {
@@ -29,15 +30,15 @@ export default function Login() {
     <div className="min-h-screen bg-beige flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-body">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-amber flex items-center justify-center font-display font-bold text-navy text-2xl shadow-lg">
-            {ecole.logoInitiales}
+          <div className="w-16 h-16 rounded-xl bg-navy text-amber flex items-center justify-center font-display font-extrabold text-2xl shadow-lg shadow-navy/20">
+            EP
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-display font-extrabold text-navy">
-          {ecole.nom}
+          EduPrimaire
         </h2>
         <p className="mt-2 text-center text-sm text-slate">
-          Connectez-vous pour accéder à votre espace
+          Gestion Scolaire Intelligente
         </p>
       </div>
 
@@ -66,13 +67,9 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="focus:ring-amber focus:border-amber block w-full pl-10 sm:text-sm border-gray-300 rounded-lg p-3 border bg-beige-light"
-                  placeholder="admin@etoiles.bf"
+                  placeholder="admin@ecole.com"
                 />
               </div>
-              <p className="mt-1 text-xs text-slate">
-                Comptes démo (Mot de passe: <strong>password123</strong>)<br/>
-                admin@etoiles.bf, directeur@etoiles.bf, comptable@etoiles.bf, parent1@gmail.com
-              </p>
             </div>
 
             <div>

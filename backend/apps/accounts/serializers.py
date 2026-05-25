@@ -14,9 +14,10 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'email', 'nom', 'prenom', 'nom_complet',
             'role', 'telephone', 'photo', 'is_active',
             'ecole_id', 'ecole_nom',
-            'peut_gerer_modules', 'date_creation'
+            'peut_gerer_modules', 'date_creation',
+            'is_superuser',
         ]
-        read_only_fields = ['id', 'date_creation']
+        read_only_fields = ['id', 'date_creation', 'is_superuser']
 
     def get_ecole_id(self, obj):
         return obj.ecole.id if obj.ecole else None

@@ -59,3 +59,26 @@ export function Avatar({ prenom, nom, src, size = 'md' }) {
     </div>
   )
 }
+
+export function LogoMark({ src = '/eduprimaire-logo.png', initials = 'EP', size = 'md', className = '' }) {
+  const sizes = {
+    sm: 'w-8 h-8 rounded-lg text-xs',
+    md: 'w-10 h-10 rounded-xl text-sm',
+    lg: 'w-16 h-16 rounded-2xl text-xl',
+    xl: 'w-28 h-24 rounded-2xl text-2xl',
+  }
+
+  return (
+    <div className={`${sizes[size]} bg-white border border-beige-dark/70 shadow-sm flex items-center justify-center overflow-hidden flex-shrink-0 ${className}`}>
+      {src ? (
+        <img src={src} alt="Logo EduPrimaire" className="w-full h-full object-contain" />
+      ) : (
+        <span className="font-display font-bold text-navy">{initials}</span>
+      )}
+    </div>
+  )
+}
+
+export { default as CopyBadge } from './CopyBadge'
+export { default as ImageUploader } from './ImageUploader'
+export { default as InvitationPanel } from './InvitationPanel'

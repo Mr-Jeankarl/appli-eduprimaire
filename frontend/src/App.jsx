@@ -19,6 +19,7 @@ const Bibliotheque   = lazy(() => import('./pages/bibliotheque/Bibliotheque'))
 const Parametres     = lazy(() => import('./pages/parametres/Parametres'))
 const PortailParent  = lazy(() => import('./pages/parent/PortailParent'))
 const Onboarding     = lazy(() => import('./pages/login/Onboarding'))
+const GlobalAdminDashboard = lazy(() => import('./pages/dashboard/GlobalAdminDashboard'))
 
 const PageLoader = () => (
   <div className="h-screen w-screen flex items-center justify-center bg-beige font-display text-navy">
@@ -36,8 +37,10 @@ function ProtectedRoute() {
     return <Navigate to="/login" replace />
   }
 
-  // Rediriger vers l'onboarding si l'utilisateur n'a pas d'école
-  if (!user.ecoleId) {
+  // Si c'est un superadmin global, et qu'il n'a pas d'ID d'école impersonnée ou associée activement
+  // on le laisse naviguer, car il verra la console globale
+  const impersonatedSchoolId = localStorage.getItem('eduprimaire_impersonate_school_id')
+  if (!user.ecoleId && !user.isSuperuser && !impersonatedSchoolId) {
     return <Navigate to="/onboarding" replace />
   }
 
@@ -89,6 +92,7 @@ export default function App() {
                 <Route path="/bibliotheque"   element={<Bibliotheque />} />
                 <Route path="/parametres"     element={<Parametres />} />
                 <Route path="/portail-parent" element={<PortailParent />} />
+                <Route path="/superadmin"     element={<GlobalAdminDashboard />} />
               </Route>
             </Route>
           </Routes>

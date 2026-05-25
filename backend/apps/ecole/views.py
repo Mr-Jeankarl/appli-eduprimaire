@@ -13,6 +13,19 @@ from apps.accounts.permissions import IsAdminOrDirecteur, PeutGererModules
 from .utils import resolve_ecole
 
 
+class EcoleListView(generics.ListAPIView):
+    """Liste toutes les écoles du réseau (réservé aux superadmins et staff)."""
+    queryset = Ecole.objects.all()
+    serializer_class = EcoleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser or user.is_staff:
+            return Ecole.objects.all()
+        return Ecole.objects.none()
+
+
 class EcoleView(generics.RetrieveUpdateAPIView):
     serializer_class = EcoleSerializer
     permission_classes = [IsAuthenticated]
@@ -117,29 +130,55 @@ class InvitationListCreateView(generics.ListCreateAPIView):
     serializer_class = InvitationSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAdminOrDirecteur()]
+        return [IsAuthenticated()]
+
     def get_queryset(self):
-        # Retourne les invitations pour l'école associée à l'utilisateur
         ecole = resolve_ecole(self.request)
         return Invitation.objects.filter(ecole=ecole)
 
+    def post(self, request, *args, **kwargs):
+        if request.query_params.get('reset') == 'true' or request.data.get('reset') is True:
+            ecole = resolve_ecole(request)
+            Invitation.objects.filter(ecole=ecole, utilise=False).delete()
+            from utils.id_generator import generate_invite_code
+            roles = ['ADMIN', 'TEACHER', 'ACCOUNTANT', 'STUDENT']
+            created_invs = []
+            for role in roles:
+                inv = Invitation.objects.create(
+                    ecole=ecole,
+                    code=generate_invite_code(8),
+                    role=role,
+                    expire_le=None,
+                    utilise=False,
+                )
+                created_invs.append(inv)
+            serializer = self.get_serializer(created_invs, many=True)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return super().post(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         ecole = resolve_ecole(self.request)
-        # Générer un code si non fourni
-        import random, string
-        code = serializer.validated_data.get('code') or ('INVITE-' + ''.join(random.choices(string.ascii_uppercase + string.digits, k=6)))
+        from utils.id_generator import generate_invite_code
+        code = serializer.validated_data.get('code')
+        if code:
+            code = code.upper()
+        else:
+            code = generate_invite_code(8)
         serializer.save(ecole=ecole, code=code)
 
 
 @api_view(['GET'])
 def validate_invite(request, code):
     try:
-        inv = Invitation.objects.filter(code=code, utilise=False).first()
+        inv = Invitation.objects.filter(code__iexact=code, utilise=False).first()
         if not inv:
             return Response({'valid': False}, status=status.HTTP_404_NOT_FOUND)
-        # check expiry
         from django.utils import timezone
         if inv.expire_le and inv.expire_le < timezone.now():
             return Response({'valid': False, 'expired': True}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'valid': True, 'ecole': EcoleSerializer(inv.ecole).data})
+        return Response({'valid': True, 'ecole': EcoleSerializer(inv.ecole).data, 'role': inv.role})
     except Exception:
         return Response({'valid': False}, status=status.HTTP_400_BAD_REQUEST)

@@ -18,14 +18,14 @@
 }
 
 .dark {
-  --bg-page: #0F172A;
-  --bg-card: #1E293B;
-  --text-navy: #F1F5F9;
+  --bg-page: #0B0F19; /* Bleu nuit ardoise très sombre */
+  --bg-card: #151D30; /* Ardoise bleue foncée intermédiaire */
+  --text-navy: #F8FAFC; /* Blanc bleuté haute visibilité */
   --text-slate: #94A3B8;
   --text-slate-light: #64748B;
-  --border-beige: #334155;
+  --border-beige: #1E293B; /* Bordures sombres contrastées */
   --bg-beige-dark: #1E293B;
-  --navy-light: #334155;
+  --navy-light: #2A3B5C;
 }
 
 @layer base {

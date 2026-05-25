@@ -36,6 +36,7 @@ export function AuthProvider({ children }) {
     peutGererModules: data.peut_gerer_modules,
     ecoleId: data.ecole_id,
     ecoleNom: data.ecole_nom,
+    isSuperuser: data.is_superuser || false,
   })
 
   const login = async (email, password) => {

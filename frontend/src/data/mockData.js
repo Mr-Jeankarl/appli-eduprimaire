@@ -9,6 +9,7 @@ export const ecole = {
   email: "contact@etoiles-edu.bf",
   anneeScolaire: "2024 – 2025",
   logoInitiales: "ÉE",
+  logoUrl: "/eduprimaire-logo.png",
 }
 
 export const utilisateurConnecte = {

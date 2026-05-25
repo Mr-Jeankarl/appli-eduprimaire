@@ -14,7 +14,7 @@ const toApiPeriode = p => p === 'TRIMESTRE_1' ? 'T1' : p === 'TRIMESTRE_2' ? 'T2
 const toUiPeriode = p => p === 'T1' ? 'TRIMESTRE_1' : p === 'T2' ? 'TRIMESTRE_2' : 'TRIMESTRE_3'
 const mapEleve = e => ({ id: String(e.id), nom: e.nom, prenom: e.prenom, matricule: e.matricule, classeId: e.classe ? String(e.classe) : '', statut: e.statut === 'INACTIF' ? 'ARCHIVE' : 'INSCRIT' })
 const mapClasse = c => ({ id: String(c.id), nom: c.nom, niveau: c.niveau })
-const mapMatiere = m => ({ id: String(m.id), nom: m.nom, couleur: '#1E3A5F' })
+const mapMatiere = m => ({ id: String(m.id), nom: m.nom, couleur: '#1E3A5F', note_sur: m.note_sur || 20 })
 const mapNote = n => ({ id: String(n.id), apiId: n.id, eleveId: String(n.eleve), matiereId: String(n.matiere), periode: toUiPeriode(n.trimestre), valeur: Number(n.note), appreciation: n.observations || '' })
 
 function noteColor(v) {
@@ -107,7 +107,9 @@ export default function Notes() {
       return [...prev, { id: `n-${Date.now()}-${eleveId}`, eleveId, matiereId, periode, valeur: '', appreciation: '', [field]: val }]
     })
     if (field === 'valeur' && val !== '') {
-      const body = { eleve: Number(eleveId), matiere: Number(matiereId), trimestre: toApiPeriode(periode), type_evaluation: 'DEVOIR', note: Number(next.valeur || val), note_sur: baseNote, annee_scolaire: '2024-2025', date_evaluation: new Date().toISOString().split('T')[0], observations: next.appreciation || '' }
+      const selectedMatiere = matieresData.find(m => m.id === matiereId)
+      const maxScore = selectedMatiere?.note_sur || 20
+      const body = { eleve: Number(eleveId), matiere: Number(matiereId), trimestre: toApiPeriode(periode), type_evaluation: 'DEVOIR', note: Number(next.valeur || val), note_sur: maxScore, annee_scolaire: '2024-2025', date_evaluation: new Date().toISOString().split('T')[0], observations: next.appreciation || '' }
       const saved = existing?.apiId ? await update(`/notes/${existing.apiId}/`, body) : await create('/notes/', body)
       const mapped = mapNote(saved)
       setNotesList(prev => prev.map(n => n.id === next.id || (n.eleveId === eleveId && n.matiereId === matiereId && n.periode === periode) ? mapped : n))
@@ -192,14 +194,7 @@ export default function Notes() {
                 <div>
                   <label className="text-xs font-semibold text-slate block mb-1">Matière</label>
                   <select className="input-base w-auto" value={matiereId} onChange={e => setMatiereId(e.target.value)}>
-                    {matieresData.map(m => <option key={m.id} value={m.id}>{m.nom}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate block mb-1">Notation</label>
-                  <select className="input-base w-auto" value={baseNote} onChange={e => setBaseNote(Number(e.target.value))}>
-                    <option value={20}>Sur 20</option>
-                    <option value={10}>Sur 10</option>
+                    {matieresData.map(m => <option key={m.id} value={m.id}>{m.nom} (sur {m.note_sur || 20})</option>)}
                   </select>
                 </div>
               </>
@@ -255,7 +250,7 @@ export default function Notes() {
                   <th className="text-left px-5 py-3 text-xs font-bold text-slate uppercase tracking-wider">ID</th>
                   <th className="text-left px-5 py-3 text-xs font-bold text-slate uppercase tracking-wider">Élève</th>
                   <th className="text-left px-5 py-3 text-xs font-bold text-slate uppercase tracking-wider">Dernière note</th>
-                  <th className="text-left px-5 py-3 text-xs font-bold text-slate uppercase tracking-wider">Note / {baseNote}</th>
+                  <th className="text-left px-5 py-3 text-xs font-bold text-slate uppercase tracking-wider">Note / {matieresData.find(m => m.id === matiereId)?.note_sur || 20}</th>
                   <th className="text-left px-5 py-3 text-xs font-bold text-slate uppercase tracking-wider">Commentaire</th>
                 </>
               )}
@@ -334,7 +329,7 @@ export default function Notes() {
                     <td className="px-5 py-3 text-sm text-slate">—</td>
                     <td className="px-5 py-3">
                       <input
-                        type="number" min={0} max={baseNote} step={0.5}
+                        type="number" min={0} max={matieresData.find(m => m.id === matiereId)?.note_sur || 20} step={0.5}
                         placeholder="—"
                         value={val}
                         disabled={isParent}

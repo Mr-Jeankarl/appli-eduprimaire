@@ -50,10 +50,10 @@ ecole, _ = Ecole.objects.get_or_create(
 for module in Module.values:
     ConfigModule.objects.get_or_create(ecole=ecole, module=module)
 
-admin = user('admin@etoiles.bf', 'Fatou', 'Ouédraogo', Role.ADMIN, peut_gerer_modules=True, is_staff=True, is_superuser=True)
-directeur = user('directeur@etoiles.bf', 'Moussa', 'Traoré', Role.DIRECTEUR, peut_gerer_modules=True)
-comptable = user('comptable@etoiles.bf', 'Fatou', 'Comptable', Role.COMPTABLE)
-parent_user = user('parent1@gmail.com', 'Seydou', 'Diallo', Role.PARENT)
+admin = user('admin@etoiles.bf', 'Fatou', 'Ouédraogo', Role.ADMIN, ecole=ecole, peut_gerer_modules=True, is_staff=True, is_superuser=True)
+directeur = user('directeur@etoiles.bf', 'Moussa', 'Traoré', Role.DIRECTEUR, ecole=ecole, peut_gerer_modules=True)
+comptable = user('comptable@etoiles.bf', 'Fatou', 'Comptable', Role.COMPTABLE, ecole=ecole)
+parent_user = user('parent1@gmail.com', 'Seydou', 'Diallo', Role.PARENT, ecole=ecole)
 
 enseignants = []
 for i, (email, prenom, nom) in enumerate([
@@ -63,7 +63,7 @@ for i, (email, prenom, nom) in enumerate([
     ('seydou@etoiles.bf', 'Seydou', 'Ouédraogo'),
     ('mariam@etoiles.bf', 'Mariam', 'Diallo'),
 ], start=1):
-    u = user(email, prenom, nom, Role.ENSEIGNANT)
+    u = user(email, prenom, nom, Role.ENSEIGNANT, ecole=ecole)
     ens, _ = Enseignant.objects.get_or_create(user=u, defaults={'matricule': f'ENS-{i:03d}'})
     enseignants.append(ens)
 

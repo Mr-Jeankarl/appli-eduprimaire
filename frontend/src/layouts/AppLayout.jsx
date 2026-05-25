@@ -3,11 +3,12 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen,
   CalendarCheck, Clock, CreditCard, MessageSquare,
-  Library, Settings, Bell, Menu, X, LogOut, KeyRound, ChevronUp
+  Library, Settings, Bell, Menu, X, LogOut, KeyRound, ChevronUp, Shield
 } from 'lucide-react'
 import { ecole } from '../data/mockData'
 import { useAuth } from '../context/AuthContext'
 import { list, update } from '../services/api'
+import { LogoMark } from '../components/ui'
 
 // Définition des accès par rôle
 const TOUS = ['ADMIN', 'DIRECTEUR', 'ENSEIGNANT', 'COMPTABLE', 'PARENT']
@@ -27,6 +28,8 @@ const NAV = [
   { to: '/messages',      label: 'Messages',           icon: MessageSquare, roles: TOUS, module: 'MESSAGERIE' },
   { to: '/bibliotheque',  label: 'Bibliothèque',       icon: Library, roles: ADMIN_DIR, module: 'BIBLIOTHEQUE' },
   { to: '/parametres',    label: 'Paramètres',         icon: Settings, roles: ADMIN_DIR },
+  { divider: true, label: 'Super-Admin', roles: TOUS, isSuperadminOnly: true },
+  { to: '/superadmin',    label: 'Réseau Écoles',      icon: Shield, roles: TOUS, isSuperadminOnly: true }
 ]
 
 export default function AppLayout() {
@@ -140,6 +143,7 @@ export default function AppLayout() {
   // Filtrer les éléments de navigation en fonction du rôle et des modules activés
   const filteredNav = NAV.filter(item => {
     if (!utilisateurConnecte) return false;
+    if (item.isSuperadminOnly && !utilisateurConnecte.isSuperuser) return false;
     if (item.roles && !item.roles.includes(utilisateurConnecte.role)) return false;
     if (item.module && activeModules[item.module] === false) return false;
     return true;
@@ -159,9 +163,7 @@ export default function AppLayout() {
       {/* SIDEBAR - Hidden on mobile, overlay on small screens if forced open */}
       <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col bg-navy text-white transition-all duration-300 transform lg:relative lg:translate-x-0 ${open ? 'translate-x-0 w-60' : '-translate-x-full lg:translate-x-0 w-16'} flex-shrink-0`}>
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/10">
-          <div className="w-8 h-8 rounded-lg bg-amber flex items-center justify-center font-display font-bold text-navy text-xs flex-shrink-0">
-            {ecole.logoInitiales}
-          </div>
+          <LogoMark src={ecole.logoUrl} initials={ecole.logoInitiales} size="sm" />
           {(open || window.innerWidth < 1024) && (
             <div className="overflow-hidden">
               <p className="font-display font-bold text-sm leading-tight truncate">{ecole.nom}</p>
@@ -207,8 +209,19 @@ export default function AppLayout() {
               <p className="text-xs text-slate truncate">{utilisateurConnecte?.email}</p>
             </div>
             <div className="py-1">
-              <button className="w-full text-left px-4 py-2 text-sm text-slate hover:bg-beige hover:text-navy transition flex items-center gap-2">
-                <KeyRound size={14} /> Sécurité
+              <button 
+                onClick={() => {
+                  const isDark = document.documentElement.classList.toggle('dark')
+                  localStorage.setItem('theme', isDark ? 'dark' : 'light')
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-slate hover:bg-beige hover:text-navy transition flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <KeyRound size={14} /> Mode Sombre
+                </span>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-beige-dark text-slate">
+                  {document.documentElement.classList.contains('dark') ? 'Oui' : 'Non'}
+                </span>
               </button>
             </div>
             <div className="border-t border-beige-dark/50 py-1">
@@ -246,6 +259,24 @@ export default function AppLayout() {
 
       {/* MAIN */}
       <div className="flex-1 flex flex-col overflow-hidden relative">
+        {utilisateurConnecte?.isSuperuser && localStorage.getItem('eduprimaire_impersonate_school_id') && (
+          <div className="bg-amber text-navy text-xs font-bold py-1.5 px-4 flex justify-between items-center z-50 shadow-sm">
+            <span className="flex items-center gap-1.5">
+              <Shield size={14} />
+              Mode Impersonation : Vous explorez et contrôlez actuellement les données de cette école.
+            </span>
+            <button
+              onClick={() => {
+                localStorage.removeItem('eduprimaire_impersonate_school_id')
+                window.location.reload()
+              }}
+              className="px-2 py-0.5 bg-navy text-white hover:bg-navy-light transition rounded font-semibold text-[10px] uppercase"
+            >
+              Retour à l'admin global
+            </button>
+          </div>
+        )}
+
         <header className="h-14 bg-beige-card border-b border-beige-dark flex items-center px-4 lg:px-5 gap-4 flex-shrink-0 z-30">
           <button onClick={() => setOpen(v => !v)} className="text-slate hover:text-navy p-2 rounded-lg hover:bg-beige transition">
             {open ? <X size={20} /> : <Menu size={20} />}

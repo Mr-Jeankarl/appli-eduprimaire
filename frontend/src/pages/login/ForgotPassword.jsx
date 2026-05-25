@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ecole } from '../../data/mockData'
+import { LogoMark } from '../../components/ui'
 import { Mail, ArrowLeft, CheckCircle2 } from 'lucide-react'
 
 export default function ForgotPassword() {
@@ -18,9 +19,7 @@ export default function ForgotPassword() {
     <div className="min-h-screen bg-beige flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-body">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-2xl bg-amber flex items-center justify-center font-display font-bold text-navy text-2xl shadow-lg">
-            {ecole.logoInitiales}
-          </div>
+          <LogoMark src={ecole.logoUrl} initials={ecole.logoInitiales} size="xl" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-display font-extrabold text-navy">
           Mot de passe oublié

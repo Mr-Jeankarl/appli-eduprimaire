@@ -12,7 +12,7 @@ class InvitationSerializer(serializers.ModelSerializer):
     ecole_nom = serializers.ReadOnlyField(source='ecole.nom')
     class Meta:
         model = Invitation
-        fields = ['id', 'code', 'ecole', 'ecole_nom', 'cible_email', 'cree_le', 'expire_le', 'utilise']
+        fields = ['id', 'code', 'role', 'ecole', 'ecole_nom', 'cible_email', 'cree_le', 'expire_le', 'utilise']
 
 class ConfigModuleSerializer(serializers.ModelSerializer):
     est_obligatoire = serializers.ReadOnlyField()
