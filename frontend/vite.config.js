@@ -13,6 +13,12 @@ export default defineConfig({
         short_name: 'EduPrimaire',
         description: 'Plateforme complète de gestion pour écoles primaires',
         theme_color: '#1E3A5F',
+        background_color: '#ffffff',
+        display: 'standalone',
+        scope: '/',
+        start_url: '/',
+        orientation: 'any',
+        categories: ['education', 'productivity'],
         icons: [
           {
             src: 'pwa-192x192.png',
