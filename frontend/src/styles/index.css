@@ -18,14 +18,49 @@
 }
 
 .dark {
-  --bg-page: #0B0F19; /* Bleu nuit ardoise très sombre */
-  --bg-card: #151D30; /* Ardoise bleue foncée intermédiaire */
-  --text-navy: #F8FAFC; /* Blanc bleuté haute visibilité */
-  --text-slate: #94A3B8;
-  --text-slate-light: #64748B;
-  --border-beige: #1E293B; /* Bordures sombres contrastées */
-  --bg-beige-dark: #1E293B;
-  --navy-light: #2A3B5C;
+  --bg-page: #121212; /* Gris foncé mat type IDE */
+  --bg-card: #1E1E1E; /* Gris mat intermédiaire pour cartes/menus */
+  --text-navy: #F3F4F6; /* Blanc cassé haute visibilité */
+  --text-slate: #9CA3AF;
+  --text-slate-light: #6B7280;
+  --border-beige: #2D2D2D; /* Bordures sombres */
+  --bg-beige-dark: #2D2D2D;
+  --navy-light: #374151;
+}
+
+/* Overrides des classes utilitaires pour appliquer le mode sombre globalement */
+.dark .bg-white {
+  background-color: var(--bg-card) !important;
+}
+.dark .bg-beige {
+  background-color: var(--bg-page) !important;
+}
+.dark .bg-beige-light {
+  background-color: var(--bg-page) !important;
+}
+.dark .bg-beige-card {
+  background-color: var(--bg-card) !important;
+}
+.dark .text-navy {
+  color: var(--text-navy) !important;
+}
+.dark .text-slate {
+  color: var(--text-slate) !important;
+}
+.dark .border-beige {
+  border-color: var(--border-beige) !important;
+}
+.dark .border-beige-dark {
+  border-color: var(--border-beige) !important;
+}
+.dark .bg-white\/40 {
+  background-color: rgba(30, 30, 30, 0.4) !important;
+}
+.dark .bg-white\/50 {
+  background-color: rgba(30, 30, 30, 0.5) !important;
+}
+.dark .bg-white\/70 {
+  background-color: rgba(30, 30, 30, 0.7) !important;
 }
 
 @layer base {

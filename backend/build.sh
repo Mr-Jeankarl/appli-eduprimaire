@@ -5,7 +5,6 @@ set -o errexit
 pip install -r requirements.txt
 
 python manage.py collectstatic --no-input
-python manage.py migrate
 
-# Optional: Load initial data or mock users if this is a fresh database
-# python manage.py shell < create_mock_users.py
+# Remarque : Les migrations sont exécutées au démarrage du conteneur (runtime)
+# dans le startCommand de Render pour bénéficier du montage du disque persistant.

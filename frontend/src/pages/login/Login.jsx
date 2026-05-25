@@ -30,9 +30,7 @@ export default function Login() {
     <div className="min-h-screen bg-beige flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-body">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-xl bg-navy text-amber flex items-center justify-center font-display font-extrabold text-2xl shadow-lg shadow-navy/20">
-            EP
-          </div>
+          <LogoMark src="/eduprimaire-logo.png" initials="EP" size="xl" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-display font-extrabold text-navy">
           EduPrimaire

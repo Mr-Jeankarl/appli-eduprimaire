@@ -19,7 +19,7 @@ export default function ForgotPassword() {
     <div className="min-h-screen bg-beige flex flex-col justify-center py-12 sm:px-6 lg:px-8 font-body">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <LogoMark src={ecole.logoUrl} initials={ecole.logoInitiales} size="xl" />
+          <LogoMark src="/eduprimaire-logo.png" initials="EP" size="xl" />
         </div>
         <h2 className="mt-6 text-center text-3xl font-display font-extrabold text-navy">
           Mot de passe oublié

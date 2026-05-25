@@ -7,13 +7,15 @@ class UserSerializer(serializers.ModelSerializer):
     nom_complet = serializers.ReadOnlyField()
     ecole_id = serializers.SerializerMethodField()
     ecole_nom = serializers.SerializerMethodField()
+    ecole_logo = serializers.SerializerMethodField()
+    ecole_initiales = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'nom', 'prenom', 'nom_complet',
             'role', 'telephone', 'photo', 'is_active',
-            'ecole_id', 'ecole_nom',
+            'ecole_id', 'ecole_nom', 'ecole_logo', 'ecole_initiales',
             'peut_gerer_modules', 'date_creation',
             'is_superuser',
         ]
@@ -24,6 +26,22 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_ecole_nom(self, obj):
         return obj.ecole.nom if obj.ecole else None
+
+    def get_ecole_logo(self, obj):
+        if obj.ecole and obj.ecole.logo:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.ecole.logo.url)
+            return obj.ecole.logo.url
+        return None
+
+    def get_ecole_initiales(self, obj):
+        if obj.ecole:
+            words = obj.ecole.nom.split()
+            if len(words) >= 2:
+                return f"{words[0][0]}{words[1][0]}".upper()
+            return obj.ecole.nom[:2].upper()
+        return None
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

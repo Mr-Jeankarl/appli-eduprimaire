@@ -36,6 +36,8 @@ export function AuthProvider({ children }) {
     peutGererModules: data.peut_gerer_modules,
     ecoleId: data.ecole_id,
     ecoleNom: data.ecole_nom,
+    ecoleLogo: data.ecole_logo,
+    ecoleInitiales: data.ecole_initiales,
     isSuperuser: data.is_superuser || false,
   })
 
